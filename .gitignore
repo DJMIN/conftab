@@ -1,0 +1,12 @@
+.backup
+dist
+build
+*.egg-info
+log
+venv
+project
+projectpersonal
+projectremote
+data
+local_download_path
+disk_cache_test
