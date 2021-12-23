@@ -22,10 +22,10 @@ conft.set('es_port', 9200)
 print(conft.get('es_port', 9201))
 
 # 客户端列出全部配置，变成列表
-print(conft.list(to_dict=False))
+print(conft.list())
 
 # 客户端列出全部配置，变成字典方便调用
-print(conft.list(to_dict=True))
+print(conft.dict())
 
 # 客户端通过web浏览器管理曾经全部的配置
 print(requests.get('http://127.0.0.1:7788/html/conf').text)
