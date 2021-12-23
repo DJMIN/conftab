@@ -31,7 +31,7 @@ CONFIG.set('ES_PORT', 9200)    # 可以在代码里也可以在web界面里去�
 ES_PORT = CONFIG.get('ES_PORT')
 
 # 批量获取
-conf = CONFIG.list()  # 一次性获取该项目全部配置dict，减少http请求
+conf = CONFIG.dict()  # 一次性获取该项目全部配置dict，减少http请求
 ES_PORT = conf.get('ES_PORT')
 ```
 

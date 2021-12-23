@@ -20,9 +20,13 @@ class Tab:
             key, default=default, manager_url=self.manager_url, project=self.project, env=self.env, ver=self.ver)
         return res
 
-    def list(self, to_dict=True):
+    def list(self):
         return list_conf(
-            manager_url=self.manager_url, project=self.project, env=self.env, ver=self.ver, to_dict=to_dict)
+            manager_url=self.manager_url, project=self.project, env=self.env, ver=self.ver, to_dict=False)
+
+    def dict(self):
+        return list_conf(
+            manager_url=self.manager_url, project=self.project, env=self.env, ver=self.ver, to_dict=True)
 
     def set(self, key, value):
         return set_conf(key, value, manager_url=self.manager_url, project=self.project, env=self.env, ver=self.ver)
