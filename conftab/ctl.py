@@ -28,7 +28,7 @@ def ctl():
 @click.command()
 @click.option('-h', '--host', default="0.0.0.0", help='web管理端绑定host')
 @click.option('-p', '--port', default=WEB_PORT, help='web管理端绑定端口号')
-@click.option('-f', '--file', default="./conftab.db", help='web管理端绑定端口号')
+@click.option('-f', '--file', default="./conftab.db", help='web管理端sqlite数据库存储位置路径')
 def run(host, port, file):
     """web manager runner"""
     file_path = os.path.realpath(file)

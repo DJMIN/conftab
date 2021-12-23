@@ -10,8 +10,12 @@
 ```shell script
 pip install conftab
 
-# 运用sqlite数据库，-f指定配置数据的保存文件位置，-p指定
+# 运用sqlite数据库，-f指定配置数据的保存文件位置，方便备份和加密迁移，-p指定服务端的监听端口
 python -m conftab.ctl run -p 7788 -f './conftab.db'
+
+# 后台启动，日志写入conftab.log
+nohup python3.9 -m conftab.ctl run -p 7788 -f './conftab.db' > conftab.log 2>&1 &
+
 ```
 
 2. 客户端： 项目通过接口在线取config配置
@@ -21,7 +25,7 @@ import conftab
 CONFIG = conftab.Tab(project='default', env='dev', ver='1.0.0', manager_url='127.0.0.1:7788')
 
 # 设置
-CONFIG.set('ES_PORT', 9200)    # （可以在代码里也可以在web界面里去调整）浏览器可以访问 http://127.0.0.1:7788/html/conf 进行界面config管理
+CONFIG.set('ES_PORT', 9200)    # 可以在代码里也可以在web界面里去调整，浏览器访问 http://127.0.0.1:7788/html/conf 进行界面config管理
 
 # 获取
 ES_PORT = CONFIG.get('ES_PORT')
