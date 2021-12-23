@@ -16,13 +16,13 @@ class Tab:
         self.ver = ver
 
     def get(self, key, default=None):
-        res = get_conf(key, manager_url=self.manager_url, project=self.project, env=self.env, ver=self.ver)
-        if res is None:
-            res = default
+        res = get_conf(
+            key, default=default, manager_url=self.manager_url, project=self.project, env=self.env, ver=self.ver)
         return res
 
     def list(self, to_dict=True):
-        return list_conf(manager_url=self.manager_url, project=self.project, env=self.env, ver=self.ver, to_dict=to_dict)
+        return list_conf(
+            manager_url=self.manager_url, project=self.project, env=self.env, ver=self.ver, to_dict=to_dict)
 
     def set(self, key, value):
         return set_conf(key, value, manager_url=self.manager_url, project=self.project, env=self.env, ver=self.ver)

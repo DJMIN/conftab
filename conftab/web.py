@@ -26,7 +26,7 @@ async def get_conf(req: fastapi.Request, db: Session = fastapi.Depends(get_db)):
         return {'data': getattr(builtins, res.value_type)(res.value), "raw": res}
     elif len(res) > 1:
         res_raw = res
-        return {'data': '配置超过两个，请检查', "raw": res_raw}
+        return {'data': None, 'err': '配置超过两个，请检查', "raw": res_raw}
     else:
         return {'data': None, 'raw': {}}
 

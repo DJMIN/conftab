@@ -3,13 +3,16 @@ import builtins
 from conftab.default import WEB_HOST, WEB_PORT, PROJECT_NAME, ENV, VERSION
 
 
-def get_conf(key, manager_url=f'{WEB_HOST}:{WEB_PORT}', project=PROJECT_NAME, env=ENV, ver=VERSION):
-    return requests.get(f'http://{manager_url}/api/conf/get', data={
+def get_conf(key, default=None, manager_url=f'{WEB_HOST}:{WEB_PORT}', project=PROJECT_NAME, env=ENV, ver=VERSION):
+    res = requests.get(f'http://{manager_url}/api/conf/get', data={
         'project': project,
         'env': env,
         'ver': ver,
         'key': key,
-    }).json()
+    }).json().get('data')
+    if res is None:
+        res = default
+    return res
 
 
 def list_conf(manager_url=f'{WEB_HOST}:{WEB_PORT}', project=PROJECT_NAME, env=ENV, ver=VERSION, to_dict=True):
