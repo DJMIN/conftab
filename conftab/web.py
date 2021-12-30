@@ -6,6 +6,8 @@ import fastapi
 import logging
 from conftab.model import get_db, Server, Conf, Session
 from conftab.default import SQLALCHEMY_DATABASE_URL
+from sqlalchemy import desc
+
 
 app = fastapi.FastAPI()
 
@@ -20,7 +22,7 @@ async def index(req: fastapi.Request):
 async def get_conf(req: fastapi.Request, db: Session = fastapi.Depends(get_db)):
     logging.info(f'{dict(req.items())}')
     data = (dict(await req.form()))
-    res = db.query(Conf).filter(*(getattr(Conf, k) == v for k, v in data.items())).limit(1).all()
+    res = db.query(Conf).filter(*(getattr(Conf, k) == v for k, v in data.items())).order_by(desc(Conf.timecreate)).limit(1).all()
     if len(res) == 1:
         res = res[0]
         return {'data': getattr(builtins, res.value_type)(res.value), "raw": res}
