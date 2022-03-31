@@ -37,7 +37,9 @@ def run(host, port, file):
     set_url(f'sqlite:///{file_path}')
 
     from conftab.model import init_db
+    from conftab.modelsecret import init_db as init_db_secret
     init_db()
+    init_db_secret()
 
     click.echo(f'start manager: {host}:{port} db路径: {file_path}')
     # sockobj = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
