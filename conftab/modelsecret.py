@@ -7,10 +7,40 @@ import sqlalchemy.exc
 import datetime
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.orm import sessionmaker, Session, scoped_session
 from conftab.default import SQLALCHEMY_DATABASE_URL_SECRET
 from fastapi import Request
 
+# 创建对象的基类:
+# from werkzeug.local import LocalProxy
+#
+#
+# class SessionManager(object):
+#     def __init__(self, base_uri, **kwargs):
+#         self._session = None
+#         self.base_uri = base_uri
+#         self.kwargs = kwargs
+#
+#     def get_session(self):
+#         if self._session:
+#             if self._session.name == self.base_uri:
+#                 return self._session
+#             else:
+#                 self._session.remove()
+#                 self._session = None
+#
+#         if not self._session:
+#             engine = create_engine(self.base_uri, **self.kwargs)
+#             Base.metadata.create_all(engine)
+#             db_session = scoped_session(sessionmaker(bind=engine))
+#             db_session.name = self.base_uri
+#             self._session = db_session
+#         return self._session
+#
+#
+# session_manager = SessionManager(base_uri=SQLALCHEMY_DATABASE_URL_SECRET,
+#                                  connect_args={"check_same_thread": False}, pool_recycle=3600)
+# db_session = LocalProxy(session_manager.get_session)
 
 print(f"db路径: {SQLALCHEMY_DATABASE_URL_SECRET}")
 # 生成一个SQLAlchemy引擎
@@ -44,7 +74,9 @@ def get_db():
     try:
         yield db
     finally:
-        db.close()
+        # 如何恰当的关闭sqlalchemy数据库连接 https://blog.csdn.net/Outsider_Lily/article/details/107627991
+        # db.close()  # 事实上，链接依旧没有关闭。若要真正关闭链接，则需要采用：conn.dispose()
+        db.dispose()
 
 
 class Mixin:

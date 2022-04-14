@@ -48,6 +48,12 @@ def get_db():
 
 
 class Mixin:
+    def __init__(self, **kwargs):
+        cols = self.get_columns()
+        for k, v in kwargs.items():
+            if k in cols:
+                setattr(self, k, v)
+
     def to_dict(self):
         return {c.name: getattr(self, c.name, None) for c in getattr(self, "__table__").columns}
 
@@ -63,16 +69,12 @@ class Conf(Base, Mixin):
     env = Column(String(64), index=True)
     ver = Column(String(64), index=True)
     key = Column(String(64), index=True)
-    value = Column(String(1024))
+    value = Column(Text())
     value_type = Column(String(64), index=True)
     timecreate = Column(Integer, index=True)
     timeupdate = Column(Integer, index=True)
     time_create = Column(DateTime, index=True)
     time_update = Column(DateTime, index=True)
-
-    def __init__(self, **kwargs):
-        for k, v in kwargs.items():
-            setattr(self, k, v)
 
 
 class Audit(Base, Mixin):
@@ -96,9 +98,6 @@ class Audit(Base, Mixin):
     time_create = Column(DateTime, index=True)
     time_update = Column(DateTime, index=True)
 
-    def __init__(self, **kwargs):
-        for k, v in kwargs.items():
-            setattr(self, k, v)
 
     @classmethod
     async def add_self(cls, db: Session, req: Request, error=None):

@@ -1,9 +1,12 @@
 from conftab.function import get_conf, list_conf, set_conf
 from conftab.default import WEB_HOST, WEB_PORT, PROJECT_NAME, ENV, VERSION
+from conftab.cyhper import RSACtrl
 
 
 class Tab:
-    def __init__(self, manager_url=f"{WEB_HOST}:{WEB_PORT}", project=PROJECT_NAME, env=ENV, ver=VERSION):
+    def __init__(
+            self, manager_url=f"{WEB_HOST}:{WEB_PORT}", project=PROJECT_NAME,
+            env=ENV, ver=VERSION, key_pub='', key_pri=''):
         if len(ms := manager_url.split(':')) < 2:
             self.host = ms[0]
             self.port = 7788
@@ -15,18 +18,67 @@ class Tab:
         self.env = env
         self.ver = ver
 
+        if key_pub:
+            if key_pub.startswith('-----BEGIN '):
+                public_key = key_pub
+                publickey_path = None
+            else:
+                public_key = None
+                publickey_path = key_pub
+            self.can_encrypt = True
+
+        else:
+            public_key = None
+            publickey_path = None
+            self.can_encrypt = False
+        if key_pri:
+            if key_pri.startswith('-----BEGIN '):
+                private_key = key_pri
+                privatekey_path = None
+            else:
+                private_key = None
+                privatekey_path = key_pri
+            self.can_decipher = True
+        else:
+            private_key = None
+            privatekey_path = None
+            self.can_decipher = False
+        self.rsa_ctrl = RSACtrl(
+            private_key=private_key, public_key=public_key,
+            privatekey_path=privatekey_path, publickey_path=publickey_path
+        ).load_or_generate_key(2048)
+
     def get(self, key, default=None):
-        res = get_conf(
-            key, default=default, manager_url=self.manager_url, project=self.project, env=self.env, ver=self.ver)
+        if self.can_decipher:
+            res = get_conf(
+                key, default=default, manager_url=self.manager_url,
+                project=self.project, env=self.env, ver=self.ver, rsa_ctrl=self.rsa_ctrl)
+        else:
+            res = get_conf(
+                key, default=default, manager_url=self.manager_url,
+                project=self.project, env=self.env, ver=self.ver)
         return res
 
     def list(self):
-        return list_conf(
-            manager_url=self.manager_url, project=self.project, env=self.env, ver=self.ver, to_dict=False)
+        if self.can_decipher:
+            res = list_conf(
+                manager_url=self.manager_url, project=self.project,
+                env=self.env, ver=self.ver, to_dict=False, rsa_ctrl=self.rsa_ctrl)
+        else:
+            res = list_conf(
+                manager_url=self.manager_url, project=self.project, env=self.env, ver=self.ver, to_dict=False)
+        return res
 
     def dict(self):
-        return list_conf(
-            manager_url=self.manager_url, project=self.project, env=self.env, ver=self.ver, to_dict=True)
+        if self.can_decipher:
+            res = list_conf(manager_url=self.manager_url, project=self.project,
+                            env=self.env, ver=self.ver, to_dict=True, rsa_ctrl=self.rsa_ctrl)
+        else:
+            res = list_conf(
+                manager_url=self.manager_url, project=self.project, env=self.env, ver=self.ver, to_dict=True)
+        return res
 
     def set(self, key, value):
+        if self.can_encrypt:
+            value = self.rsa_ctrl.encode(value)
         return set_conf(key, value, manager_url=self.manager_url, project=self.project, env=self.env, ver=self.ver)

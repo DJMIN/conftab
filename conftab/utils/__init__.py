@@ -14,6 +14,8 @@ async def get_req_data(req, get_json=True, raise_err=False):
             raise
 
     data = data | dict(await req.form() or {}) | data_json
+
+    print(data)
     return data
 
 

@@ -212,6 +212,8 @@ class RSACtrl:
             raise ValueError(f'【失败】公钥加密，公钥为: {self.public_key}')
         # 分段加密
         encrypt_text = []
+        if isinstance(msg, (int, dict)):
+            msg = str(msg)
         if isinstance(msg, str):
             msg = msg.encode("utf-8")
         # 对数据进行分段加密

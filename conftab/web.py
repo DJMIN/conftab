@@ -10,8 +10,9 @@ from conftab.modelsecret import get_db as get_db_secret
 from conftab.modelsecret import Session as Session_secret
 from conftab import modelsecret
 from conftab import model
+from conftab.cyhper import RSACtrl
 from conftab.utils import get_req_data, format_to_table, format_to_form
-from conftab.default import SQLALCHEMY_DATABASE_URL
+from conftab.default import SQLALCHEMY_DATABASE_URL, SQLALCHEMY_DATABASE_URL_SECRET, PUBKEY_PATH, PRIKEY_PATH
 from sqlalchemy import desc
 
 logger = logging.getLogger('conftab.web')
@@ -28,6 +29,8 @@ item_clss_secret = {cls.__tablename__: cls for cls in (
     modelsecret.Audit,
 )}
 
+
+rsa_ctrl = RSACtrl(privatekey_path=PRIKEY_PATH, publickey_path=PUBKEY_PATH).load_or_generate_key(2048)
 app = fastapi.FastAPI()
 
 
@@ -83,7 +86,14 @@ async def index():
     return {
         "server": 'conftab', "msg": "hello! http://127.0.0.1:7788/html/conf  http://127.0.0.1:7788/html/secret",
         "db": SQLALCHEMY_DATABASE_URL,
+        "db_secert": SQLALCHEMY_DATABASE_URL_SECRET,
+        "pubkey": rsa_ctrl.public_key,
         'server_time': time.time()}
+
+
+@app.get('/pubkey')
+async def pubkey_show():
+    return rsa_ctrl.public_key
 
 
 @app.get('/senderr')
@@ -96,24 +106,26 @@ async def senderr(req: fastapi.Request, db: Session = fastapi.Depends(get_db)):
 @app.get('/api/conf/get')
 async def get_conf(req: fastapi.Request, db: Session = fastapi.Depends(get_db)):
     logging.info(f'{dict(req.items())}')
-    data = await get_req_data(req)
-    res = db.query(Conf).filter(*(getattr(
-        Conf, k) == v for k, v in data.items())).order_by(desc(Conf.timecreate)).limit(1).all()
-    if len(res) == 1:
-        res = res[0]
-        return {'data': getattr(builtins, res.value_type)(res.value), "raw": res}
-    elif len(res) > 1:
-        res_raw = res
-        return {'data': None, 'err': '配置超过两个，请检查', "raw": res_raw}
-    else:
-        return {'data': None, 'raw': {}}
+    async with AuditWithExceptionContextManager(db, req, a_cls=model.Audit) as ctx:
+        data = await get_req_data(req)
+        res = db.query(Conf).filter(*(getattr(
+            Conf, k) == v for k, v in data.items())).order_by(desc(Conf.timeupdate)).limit(2).all()
+        if len(res) == 1:
+            ctx.res = {'data': res.value, "raw": res, "res_raw": res[0]}
+        elif len(res) > 1:
+            ctx.res = {'data': None, 'err': '配置超过两个，请检查', "raw": res, "res_raw": res[0]}
+        else:
+            ctx.res = {'data': None, 'raw': [], 'res_raw': {}}
+    return ctx.res
 
 
 @app.get('/api/conf/list')
 async def list_conf(req: fastapi.Request, db: Session = fastapi.Depends(get_db)):
-    data = await get_req_data(req)
-    res = db.query(Conf).filter(*(getattr(Conf, k) == v for k, v in data.items())).all()
-    return res
+    async with AuditWithExceptionContextManager(db, req, a_cls=model.Audit) as ctx:
+        data = await get_req_data(req)
+        res = db.query(Conf).filter(*(getattr(Conf, k) == v for k, v in data.items())).all()
+        ctx.res = res
+    return ctx.res
 
 
 @app.post('/api/conf/set')
@@ -122,7 +134,8 @@ async def set_conf(req: fastapi.Request, db: Session = fastapi.Depends(get_db)):
     async with AuditWithExceptionContextManager(db, req, a_cls=model.Audit) as ctx:
         data = await get_req_data(req)
         c = Conf(**data)
-        c.uuid = f'{c.project}--{c.env}--{c.ver}--{c.key}--{c.value}'
+        # c.uuid = f'{c.project}--{c.env}--{c.ver}--{c.key}--{c.value}'
+        c.uuid = f'{c.project}--{c.env}--{c.ver}--{c.key}'
         time_now = datetime.datetime.now()
         c.timecreate = time_now.timestamp()
         c.time_create = time_now
@@ -137,15 +150,14 @@ async def get_conf(item_name, req: fastapi.Request, db: Session_secret = fastapi
         data = await get_req_data(req)
         cls = item_clss_secret.get(item_name)
         res = db.query(cls).filter(*(getattr(cls, k) == v for k, v in data.items())).order_by(
-            desc(Conf.timecreate)).limit(1).all()
+            desc(Conf.timecreate)).limit(2).all()
         if len(res) == 1:
-            res = res[0]
-            ctx.res = {'data': getattr(builtins, res.value_type)(res.value), "raw": res}
+            ctx.res = {'data': getattr(builtins, res.value_type)(
+                res.value) if res.value_type in dir(builtins) else res.value, "raw": res, "res_raw": res[0]}
         elif len(res) > 1:
-            res_raw = res
-            ctx.res = {'data': None, 'err': '配置超过两个，请检查', "raw": res_raw}
+            ctx.res = {'data': None, 'err': '配置超过两个，请检查', "raw": res, "res_raw": res[0]}
         else:
-            ctx.res = {'data': None, 'raw': {}}
+            ctx.res = {'data': None, "raw": [], "res_raw": {}}
     return ctx.res
 
 
@@ -170,6 +182,17 @@ async def set_conf(item_name, req: fastapi.Request, db: Session_secret = fastapi
         c.timeupdate = time_now.timestamp()
         c.time_update = time_now
         db.merge(c)
+        db.commit()
+    return ctx.res
+
+
+@app.delete('/api/secretItem/{item_name}')
+async def del_item(item_name, req: fastapi.Request, db: Session_secret = fastapi.Depends(get_db_secret)):
+    async with AuditWithExceptionContextManager(db, req, a_cls=modelsecret.Audit) as ctx:
+        data = await get_req_data(req)
+        c = item_clss_secret.get(item_name)(**data)
+        # c.uuid = f'{c.project}--{c.env}--{c.ver}--{c.key}--{c.value}'
+        db.delete(c)
         db.commit()
     return ctx.res
 

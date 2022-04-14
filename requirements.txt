@@ -7,3 +7,4 @@ python-multipart
 wheel
 twine
 pycryptodome
+werkzeug
