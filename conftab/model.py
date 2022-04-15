@@ -55,11 +55,11 @@ class Mixin:
                 setattr(self, k, v)
 
     def to_dict(self):
-        return {c.name: getattr(self, c.name, None) for c in getattr(self, "__table__").columns}
+        return {c.name: getattr(self, c.name, None) for c in self.get_columns()}
 
     @classmethod
     def get_columns(cls):
-        return [str(col).split('.')[-1] for col in getattr(cls, "__table__").columns]
+        return [c.name for c in getattr(cls, "__table__").columns]
 
 
 class Conf(Base, Mixin):

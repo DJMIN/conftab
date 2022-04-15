@@ -96,6 +96,29 @@ async def pubkey_show():
     return rsa_ctrl.public_key
 
 
+@app.get('/keyRandom')
+async def key_random():
+    time_start = time.time()
+    rsa_c = RSACtrl(privatekey_path=PRIKEY_PATH, publickey_path=PUBKEY_PATH).load_or_generate_key(2048)
+
+    return {
+        "use_time": time.time()-time_start,
+        "pub": rsa_c.public_key,
+        "pri": rsa_c.private_key,
+        'server_time': time.time()
+    }
+
+
+@app.get('/isCtrl')
+async def is_ctrl(req: fastapi.Request):
+    data = await get_req_data(req)
+    return {
+        "status": 1 if data.get('status') else 0,
+        "user": 'admin',
+        'server_time': time.time()
+    }
+
+
 @app.get('/senderr')
 async def senderr(req: fastapi.Request, db: Session = fastapi.Depends(get_db)):
     async with AuditWithExceptionContextManager(db, req) as ctx:
@@ -166,7 +189,13 @@ async def list_conf(item_name, req: fastapi.Request, db: Session_secret = fastap
     async with AuditWithExceptionContextManager(db, req, a_cls=modelsecret.Audit) as ctx:
         data = await get_req_data(req)
         cls = item_clss_secret.get(item_name)
-        ctx.res = db.query(cls).filter(*(getattr(cls, k) == v for k, v in data.items())).all()
+        ctx.res = {
+            "server_time": time.time(),
+            "data": [
+                d.to_dict() for d in db.query(cls).filter(
+                    *(getattr(cls, k) == v for k, v in data.items())
+                ).all()]
+        }
     return ctx.res
 
 

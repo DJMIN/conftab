@@ -75,8 +75,8 @@ def get_db():
         yield db
     finally:
         # 如何恰当的关闭sqlalchemy数据库连接 https://blog.csdn.net/Outsider_Lily/article/details/107627991
-        # db.close()  # 事实上，链接依旧没有关闭。若要真正关闭链接，则需要采用：conn.dispose()
-        db.dispose()
+        db.close()  # 事实上，链接依旧没有关闭。若要真正关闭链接，则需要采用：conn.dispose()
+        # db.dispose()
 
 
 class Mixin:
@@ -85,7 +85,7 @@ class Mixin:
 
     @classmethod
     def get_columns(cls):
-        return [str(col).split('.')[-1] for col in cls.__table__.columns]
+        return [c.name for c in cls.__table__.columns]
 
 
 class Key(Base, Mixin):
