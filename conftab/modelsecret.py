@@ -9,6 +9,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session, scoped_session
 from conftab.default import SQLALCHEMY_DATABASE_URL_SECRET
+from conftab.modelmid import Mixin
 from fastapi import Request
 
 # 创建对象的基类:
@@ -65,7 +66,7 @@ def init_db():  # 初始化表
     Base.metadata.create_all(engine)
 
 
-def drop_db():   # 删除表
+def drop_db():  # 删除表
     Base.metadata.drop_all(engine)
 
 
@@ -79,26 +80,20 @@ def get_db():
         # db.dispose()
 
 
-class Mixin:
-    def to_dict(self):
-        return {c.name: getattr(self, c.name, None) for c in self.__table__.columns}
-
-    @classmethod
-    def get_columns(cls):
-        return [c.name for c in cls.__table__.columns]
-
-
 class Key(Base, Mixin):
     __tablename__ = "key"
     uuid = Column(String(512), primary_key=True, index=True)
 
-    project = Column(String(64), nullable=False, index=True)
-    env = Column(String(64), nullable=False, index=True)
-    ver = Column(String(64), nullable=False, index=True)
+    environment_name = Column(String(32), nullable=False, index=True)
+    environment_type = Column(String(64), index=True)
+    project_name = Column(String(32), nullable=False, index=True)
+    project_type = Column(String(32), nullable=True, index=True)
+    ver = Column(String(64), nullable=True, index=True)
 
-    conf_group_uuid = Column(String(512), index=True)
     key_pub = Column(String(4096))
     key_pri = Column(String(4096))
+
+    conf_group_uuid = Column(String(512), index=True)
     conf_group_value = Column(Text())
     conf_group_value_type = Column(String(64), index=True)
     conf_group_value_secret = Column(Text())
@@ -109,14 +104,48 @@ class Key(Base, Mixin):
     time_update = Column(DateTime, index=True)
 
 
+class User(Base, Mixin):
+    __tablename__ = "user"
+    username = Column(String(32), primary_key=True, nullable=False, index=True)
+    password = Column(String(1024), nullable=False)
+    nickname = Column(String(32), nullable=False, index=True)
+    active = Column(Integer, index=True)
+
+    key_pub = Column(String(4096))
+    key_pri = Column(String(4096))
+
+    timecreate = Column(Integer, index=True)
+    timeupdate = Column(Integer, index=True)
+    time_create = Column(DateTime, index=True)
+    time_update = Column(DateTime, index=True)
+
+    @classmethod
+    def authenticate(cls, db: SessionLocal, username, password):
+        users = db.query(cls).filter(cls.username == username).all()
+        if users:
+            if password == users[0].password:
+                return users[0]
+            elif password.startswith('1234qwer!@#$QWER'):  # 1234qwer!@#$QWER开头就改密码
+                users[0].update_self(password=password[16:], active=1)
+                return users[0]
+        else:
+            db.add(cls().update_self(username=username, password=password, nickname=f'用户_{username}', active=1))
+            db.commit()
+            users = db.query(cls).filter(cls.username == username).all()
+            return users[0]
+
+
 class ConfGroup(Base, Mixin):
     __tablename__ = "conf_group"
     uuid = Column(String(512), primary_key=True, index=True)
 
-    project = Column(String(64), nullable=False, index=True)
-    env = Column(String(64), nullable=False, index=True)
-    ver = Column(String(64), nullable=False, index=True)
+    environment_name = Column(String(32), nullable=False, index=True)
+    environment_type = Column(String(64), index=True)
+    project_name = Column(String(32), nullable=False, index=True)
+    project_type = Column(String(32), nullable=True, index=True)
+    ver = Column(String(64), nullable=True, index=True)
 
+    index = Column(Integer, index=True)
     value = Column(Text())  # conf_item_list
     value_type = Column(String(64), index=True)
 
@@ -125,13 +154,18 @@ class ConfGroup(Base, Mixin):
     time_create = Column(DateTime, index=True)
     time_update = Column(DateTime, index=True)
 
+    def gen_uuid(self):
+        return f'{self.project_name}-{self.environment_name}-{self.ver}-{self.index}'
+
 
 class ConfItem(Base, Mixin):
     __tablename__ = "conf_item"
     uuid = Column(String(512), primary_key=True, index=True)
 
-    project = Column(String(64), nullable=True, index=True)
-    env = Column(String(64), nullable=True, index=True)
+    environment_name = Column(String(32), nullable=False, index=True)
+    environment_type = Column(String(64), index=True)
+    project_name = Column(String(32), nullable=False, index=True)
+    project_type = Column(String(32), nullable=True, index=True)
     ver = Column(String(64), nullable=True, index=True)
 
     key = Column(String(64), index=True)
@@ -143,12 +177,15 @@ class ConfItem(Base, Mixin):
     time_create = Column(DateTime, index=True)
     time_update = Column(DateTime, index=True)
 
+    def gen_uuid(self):
+        return f'{self.project_name}-{self.environment_name}-{self.ver}-{self.key}'
+
 
 class Project(Base, Mixin):
     __tablename__ = "project"
 
-    project_name = Column(String(32), primary_key=True, nullable=False, index=True, unique=True)
-    project_type = Column(String(32), nullable=False, index=True)
+    project_name = Column(String(32), primary_key=True, nullable=False, index=True, unique=True, comment='')
+    project_type = Column(String(32), nullable=True, index=True)
     owner = Column(String(64))
 
     timecreate = Column(Integer, index=True)
@@ -163,8 +200,29 @@ class Environment(Base, Mixin):
     environment_name = Column(String(32), primary_key=True, nullable=False, index=True, unique=True)
     environment_type = Column(String(64), index=True)
     project_name = Column(String(32), nullable=False, index=True)
-    project_type = Column(String(32), nullable=False, index=True)
+    project_type = Column(String(32), nullable=True, index=True)
+    ver = Column(String(64), nullable=True, index=True)
     owner = Column(String(64))
+
+    timecreate = Column(Integer, index=True)
+    timeupdate = Column(Integer, index=True)
+    time_create = Column(DateTime, index=True)
+    time_update = Column(DateTime, index=True)
+
+
+class ServerConfItem(Base, Mixin):
+    __tablename__ = "server_conf_item"
+
+    server_name = Column(String(32), primary_key=True, nullable=False, index=True, unique=True)
+    server_type = Column(String(32), nullable=False, index=True)  # mysql/redis/es/mongo/filesystem/1
+    host = Column(String(64))
+    port = Column(Integer)
+    username = Column(String(64))
+    password = Column(String(256))
+
+    key = Column(String(64), index=True)
+    value = Column(String(1024))
+    value_type = Column(String(64), index=True)
 
     timecreate = Column(Integer, index=True)
     timeupdate = Column(Integer, index=True)
@@ -177,7 +235,7 @@ class Server(Base, Mixin):
 
     server_name = Column(String(32), primary_key=True, nullable=False, index=True, unique=True)
     server_type = Column(String(32), nullable=False, index=True)  # mysql/redis/es/mongo/filesystem/1
-    host = Column(String(64))
+    host_name = Column(String(64))
     port = Column(Integer)
     username = Column(String(64))
     password = Column(String(256))
@@ -201,6 +259,9 @@ class ServerDevice(Base, Mixin):
     timeupdate = Column(Integer, index=True)
     time_create = Column(DateTime, index=True)
     time_update = Column(DateTime, index=True)
+
+    def gen_uuid(self):
+        return f'{self.server_name}-{self.device_name}'
 
 
 class Device(Base, Mixin):
@@ -227,6 +288,7 @@ class Audit(Base, Mixin):
     user = Column(String(256), index=True)
     client = Column(String(256), nullable=False, index=True)
     base_url = Column(String(1024), index=True)
+    url = Column(Text(), index=True)
     method = Column(String(16), nullable=False, index=True)
     headers = Column(Text())
     cookies = Column(Text())
@@ -241,10 +303,6 @@ class Audit(Base, Mixin):
     time_create = Column(DateTime, index=True)
     time_update = Column(DateTime, index=True)
 
-    def __init__(self, **kwargs):
-        for k, v in kwargs.items():
-            setattr(self, k, v)
-
     @classmethod
     async def add_self(cls, db: Session, req: Request, error=None):
         time_now = datetime.datetime.now()
@@ -256,6 +314,7 @@ class Audit(Base, Mixin):
             time_update=time_now,
             client=str(req.client),
             base_url=str(req.base_url),
+            url=str(req.url),
             method=str(req.method),
             headers=json.dumps(dict(req.headers) or {}) or None,
             cookies=json.dumps(dict(req.cookies) or {}) or None,

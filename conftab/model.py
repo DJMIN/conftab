@@ -9,6 +9,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 from conftab.default import SQLALCHEMY_DATABASE_URL
+from conftab.modelmid import Mixin
 from fastapi import Request
 
 
@@ -47,21 +48,6 @@ def get_db():
         db.close()
 
 
-class Mixin:
-    def __init__(self, **kwargs):
-        cols = self.get_columns()
-        for k, v in kwargs.items():
-            if k in cols:
-                setattr(self, k, v)
-
-    def to_dict(self):
-        return {c.name: getattr(self, c.name, None) for c in self.get_columns()}
-
-    @classmethod
-    def get_columns(cls):
-        return [c.name for c in getattr(cls, "__table__").columns]
-
-
 class Conf(Base, Mixin):
     __tablename__ = "conf"
     uuid = Column(String(512), primary_key=True, index=True)
@@ -84,6 +70,7 @@ class Audit(Base, Mixin):
     user = Column(String(256), index=True)
     client = Column(String(256), nullable=False, index=True)
     base_url = Column(String(1024), index=True)
+    url = Column(Text(), index=True)
     method = Column(String(16), nullable=False, index=True)
     headers = Column(Text())
     cookies = Column(Text())
@@ -98,7 +85,6 @@ class Audit(Base, Mixin):
     time_create = Column(DateTime, index=True)
     time_update = Column(DateTime, index=True)
 
-
     @classmethod
     async def add_self(cls, db: Session, req: Request, error=None):
         time_now = datetime.datetime.now()
@@ -110,6 +96,7 @@ class Audit(Base, Mixin):
             time_update=time_now,
             client=str(req.client),
             base_url=str(req.base_url),
+            url=str(req.url),
             method=str(req.method),
             headers=json.dumps(dict(req.headers) or {}) or None,
             cookies=json.dumps(dict(req.cookies) or {}) or None,

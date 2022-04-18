@@ -9,7 +9,7 @@ VERSION = '1.0.0'
 
 # SQLALCHEMY_DATABASE_URL: str = 'sqlite:///:memory:'
 SQLALCHEMY_DATABASE_URL: str = 'sqlite:///conftab.db'
-SQLALCHEMY_DATABASE_URL_SECRET: str = 'sqlite:///conftab_secret.db'
+SQLALCHEMY_DATABASE_URL_SECRET: str = 'sqlite:///D:/pyproject/conftab/conftab_secret.db'
 
 PUBKEY_PATH: str = './server_key_pub.key'
 PRIKEY_PATH: str = './server_key_pri.key'

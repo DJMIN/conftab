@@ -14,8 +14,6 @@ async def get_req_data(req, get_json=True, raise_err=False):
             raise
 
     data = data | dict(await req.form() or {}) | data_json
-
-    print(data)
     return data
 
 
@@ -29,7 +27,12 @@ def format_to_form(action, keys):
         '''.format(
         action,
         ''.join(
-            f"""<tr><td>{key}</td><td><input style="width:100%;" type="text" name="{key}"></td></tr>"""
+            f"""<tr>
+            <td style="width:13%;" >{key['name']}</td>
+            <td style="width:7%;" >主键：{key['primary_key']}</td>
+            <td style="width:15%;" >{key['type_str']}</td>
+            <td style="width:15%;" >注释：{key['comment']}</td>
+            <td><input style="width:100%;" type="text" name="{key['name']}"></td></tr>"""
             for key in keys
         )
     )

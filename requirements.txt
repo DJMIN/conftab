@@ -8,3 +8,6 @@ wheel
 twine
 pycryptodome
 werkzeug
+pydantic
+python-jose
+guesstime

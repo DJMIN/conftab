@@ -1,7 +1,9 @@
 import builtins
 import datetime
+import os.path
 import time
 import traceback
+import guesstime
 
 import fastapi
 import logging
@@ -13,7 +15,11 @@ from conftab import model
 from conftab.cyhper import RSACtrl
 from conftab.utils import get_req_data, format_to_table, format_to_form
 from conftab.default import SQLALCHEMY_DATABASE_URL, SQLALCHEMY_DATABASE_URL_SECRET, PUBKEY_PATH, PRIKEY_PATH
+from conftab.security import create_access_token, check_jwt_token, ACCESS_TOKEN_EXPIRE_MINUTES
 from sqlalchemy import desc
+
+from typing import List, Optional, Union, Any
+from pydantic import BaseModel, Field
 
 logger = logging.getLogger('conftab.web')
 
@@ -23,12 +29,32 @@ item_clss_secret = {cls.__tablename__: cls for cls in (
     modelsecret.ConfItem,
     modelsecret.Project,
     modelsecret.Environment,
+    modelsecret.ServerConfItem,
     modelsecret.Server,
     modelsecret.ServerDevice,
     modelsecret.Device,
     modelsecret.Audit,
 )}
 
+
+def to_datetime(string):
+    return guesstime.GuessTime(string, raise_err=False).to_datetime()
+
+
+def to_int(string):
+    try:
+        res = int(string)
+    except ValueError:
+        res = 0
+    return res
+
+
+change_type = {
+    "INTE": to_int,
+    "VARC": str,
+    "TEXT": str,
+    "DATE": to_datetime,
+}
 
 rsa_ctrl = RSACtrl(privatekey_path=PRIKEY_PATH, publickey_path=PUBKEY_PATH).load_or_generate_key(2048)
 app = fastapi.FastAPI()
@@ -39,7 +65,7 @@ class AuditWithExceptionContextManager:
     用上下文管理器捕获异常，可对代码片段进行错误捕捉，比装饰器更细腻
     """
 
-    def __init__(self, db, req, verbose=0, raise__exception=False, a_cls=model.Audit):
+    def __init__(self, db, req, verbose=None, raise__exception=False, a_cls=model.Audit):
         """
            :param verbose: 打印错误的深度,对应traceback对象的limit，为正整数
         """
@@ -68,10 +94,11 @@ class AuditWithExceptionContextManager:
         if exc_tb is not None:
             ex_str = f'[{str(exc_type)}] {str(exc_val)}'
             tb = '\n'.join(
-                traceback.format_tb(exc_tb)[:self._verbose]
+                traceback.format_tb(exc_tb, self._verbose)
                 if self._verbose else traceback.format_tb(exc_tb))
             exc_tb_str = f'{ex_str}\n{tb}'
             self.res = self.format_res(message=ex_str, detail=exc_tb_str, suc=False)
+            print(11111, self.res)
             if not self._raise__exception:
                 logger.error(exc_tb_str)
         else:
@@ -91,38 +118,84 @@ async def index():
         'server_time': time.time()}
 
 
-@app.get('/pubkey')
+@app.get('/api/pubkey')
 async def pubkey_show():
     return rsa_ctrl.public_key
 
 
-@app.get('/keyRandom')
+@app.get('/api/keyRandom')
 async def key_random():
     time_start = time.time()
     rsa_c = RSACtrl(privatekey_path=PRIKEY_PATH, publickey_path=PUBKEY_PATH).load_or_generate_key(2048)
 
     return {
-        "use_time": time.time()-time_start,
+        "use_time": time.time() - time_start,
         "pub": rsa_c.public_key,
         "pri": rsa_c.private_key,
         'server_time': time.time()
     }
 
 
-@app.get('/isCtrl')
-async def is_ctrl(req: fastapi.Request):
+@app.get('/api/isCtrl')
+async def is_ctrl(
+        req: fastapi.Request,
+        token_data: Union[str, Any] = fastapi.Depends(check_jwt_token)
+):
     data = await get_req_data(req)
+    db_status = 1 if os.path.exists(SQLALCHEMY_DATABASE_URL_SECRET.split('sqlite:///')[-1]) else 0
     return {
-        "status": 1 if data.get('status') else 0,
-        "user": 'admin',
+        "status": 1 if data.get('status') else db_status,
+        "db_path": SQLALCHEMY_DATABASE_URL_SECRET,
+        "user": token_data,
         'server_time': time.time()
     }
 
 
-@app.get('/senderr')
+@app.get('/api/senderr')
 async def senderr(req: fastapi.Request, db: Session = fastapi.Depends(get_db)):
     async with AuditWithExceptionContextManager(db, req) as ctx:
         raise ValueError(str(await get_req_data(req)))
+    return ctx.res
+
+
+class UserInfo(BaseModel):
+    username: str
+    password: str
+
+
+@app.post("/api/login/access-token", summary="用户登录认证")
+async def login_access_token(
+        *,
+        req: fastapi.Request,
+        db: Session_secret = fastapi.Depends(get_db_secret),
+        user_info: UserInfo,
+) -> Any:
+    """
+    用户登录
+    :param db:
+    :param user_info:
+    :return:
+    """
+
+    async with AuditWithExceptionContextManager(db, req, a_cls=modelsecret.Audit) as ctx:
+        # 验证用户账号密码是否正确
+        user = modelsecret.User.authenticate(db, username=user_info.username, password=user_info.password)
+
+        if not user:
+            logger.info(f"用户认证错误, username:{user_info.username} password:{user_info.password}")
+            ctx.res = ctx.format_res("用户名或者密码错误", suc=False)
+        elif not user.active:
+            ctx.res = ctx.format_res("用户未激活", suc=False)
+
+        # 如果用户正确通过 则生成token
+        # 设置过期时间
+        access_token_expires = datetime.timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+
+        # 登录token 只存放了user.id
+        ctx.res = ctx.format_res(
+            create_access_token(user.username, expires_delta=access_token_expires),
+        )
+
     return ctx.res
 
 
@@ -171,7 +244,7 @@ async def set_conf(req: fastapi.Request, db: Session = fastapi.Depends(get_db)):
 async def get_conf(item_name, req: fastapi.Request, db: Session_secret = fastapi.Depends(get_db_secret)):
     async with AuditWithExceptionContextManager(db, req, a_cls=modelsecret.Audit) as ctx:
         data = await get_req_data(req)
-        cls = item_clss_secret.get(item_name)
+        cls = item_clss_secret[item_name]
         res = db.query(cls).filter(*(getattr(cls, k) == v for k, v in data.items())).order_by(
             desc(Conf.timecreate)).limit(2).all()
         if len(res) == 1:
@@ -184,18 +257,50 @@ async def get_conf(item_name, req: fastapi.Request, db: Session_secret = fastapi
     return ctx.res
 
 
-@app.get('/api/secretItem/{item_name}/list')
-async def list_conf(item_name, req: fastapi.Request, db: Session_secret = fastapi.Depends(get_db_secret)):
+class ListItemParam(BaseModel):
+    # uuid: str = Field(..., description="表名称", example="task")
+    page: int = Field(..., description="页码", example=1)
+    pageSize: int = Field(..., description="页面大小", example=20)
+    filters: list = Field({}, description="过滤查询，完全匹配，K-V对list", example=[{
+        'key': 'environment_name',
+        "value": "",
+        'like': False,
+    }])
+    tableInfo: bool = Field(False, description="是否返回表信息", example=False)
+
+
+@app.post('/api/secretItem/{item_name}/list')
+async def list_item(
+        item_name, body: ListItemParam,
+        req: fastapi.Request, db: Session_secret = fastapi.Depends(get_db_secret)):
     async with AuditWithExceptionContextManager(db, req, a_cls=modelsecret.Audit) as ctx:
         data = await get_req_data(req)
-        cls = item_clss_secret.get(item_name)
+
+        if "pageSize" in data:
+            limit = int(data.pop('pageSize'))
+            if "page" in data:
+                offset = max(0, int(data.pop('page')) - 1) * limit
+            else:
+                offset = 0
+        else:
+            limit, offset = 0, 0
+        cls = item_clss_secret[item_name]
+        query_d = db.query(cls).filter(
+            *(getattr(cls, flr['key']) == flr['value']
+              for flr in data.get('filters', [])))
+        if offset:
+            query_d = query_d.offset(offset)
+        if limit:
+            query_d = query_d.limit(limit)
+
+        res = [d.to_dict() for d in query_d.all()]
         ctx.res = {
             "server_time": time.time(),
-            "data": [
-                d.to_dict() for d in db.query(cls).filter(
-                    *(getattr(cls, k) == v for k, v in data.items())
-                ).all()]
+            "data": res,
+            "total": len(res),
         }
+        if body.tableInfo:
+            ctx.res["table_info"] = cls.get_columns_infos()
     return ctx.res
 
 
@@ -203,7 +308,9 @@ async def list_conf(item_name, req: fastapi.Request, db: Session_secret = fastap
 async def set_conf(item_name, req: fastapi.Request, db: Session_secret = fastapi.Depends(get_db_secret)):
     async with AuditWithExceptionContextManager(db, req, a_cls=modelsecret.Audit) as ctx:
         data = await get_req_data(req)
-        c = item_clss_secret.get(item_name)(**data)
+        cls = item_clss_secret[item_name]
+        cls_info = cls.get_columns_info()
+        c = cls(**{k: change_type[cls_info[k]['type_str'][:4]](v) for k, v in data.items()})
         # c.uuid = f'{c.project}--{c.env}--{c.ver}--{c.key}--{c.value}'
         time_now = datetime.datetime.now()
         c.timecreate = time_now.timestamp()
@@ -216,13 +323,113 @@ async def set_conf(item_name, req: fastapi.Request, db: Session_secret = fastapi
 
 
 @app.delete('/api/secretItem/{item_name}')
-async def del_item(item_name, req: fastapi.Request, db: Session_secret = fastapi.Depends(get_db_secret)):
+async def del_item(item_name, body: ListItemParam,
+                   req: fastapi.Request, db: Session_secret = fastapi.Depends(get_db_secret)):
     async with AuditWithExceptionContextManager(db, req, a_cls=modelsecret.Audit) as ctx:
         data = await get_req_data(req)
-        c = item_clss_secret.get(item_name)(**data)
-        # c.uuid = f'{c.project}--{c.env}--{c.ver}--{c.key}--{c.value}'
-        db.delete(c)
-        db.commit()
+        if "pageSize" in data:
+            limit = int(data.pop('pageSize'))
+            if "page" in data:
+                offset = max(0, int(data.pop('page')) - 1) * limit
+            else:
+                offset = 0
+        else:
+            limit, offset = 0, 0
+        cls = item_clss_secret[item_name]
+        query_d = db.query(cls).filter(
+            *(getattr(cls, flr['key']) == flr['value']
+              for flr in data.get('filters', []))
+        )
+        if offset:
+            query_d = query_d.offset(offset)
+        if limit:
+            query_d = query_d.limit(limit)
+        res = []
+        for d in query_d.all():
+            res.append(d.to_dict())
+            db.delete(d)
+            db.commit()
+        ctx.res = {
+            "server_time": time.time(),
+            "data": res,
+            "total": len(res)
+        }
+    return ctx.res
+
+
+class ListItemPKParam(BaseModel):
+    # uuid: str = Field(..., description="表名称", example="task")
+    pks: list = Field(..., description="过滤查询，完全匹配，K-V对list", example=[
+        '1', 2, '3'
+    ])
+
+
+@app.delete('/api/secretItemByPK/{item_name}')
+async def del_item_pk(
+        item_name, body: ListItemPKParam,
+        req: fastapi.Request, db: Session_secret = fastapi.Depends(get_db_secret)):
+    async with AuditWithExceptionContextManager(db, req, a_cls=modelsecret.Audit) as ctx:
+        cls = item_clss_secret[item_name]
+        res = []
+        for pk in body.pks:
+            pk_keys = cls.get_primary_keys()
+            for d in db.query(cls).filter(
+                    *(getattr(cls, pk_key) == pk
+                      for pk_key in pk_keys)
+            ).all():
+                res.append(d.to_dict())
+                db.delete(d)
+                db.commit()
+        ctx.res = {
+            "server_time": time.time(),
+            "data": res,
+            "total": len(res)
+        }
+    return ctx.res
+
+
+class SetConfItemParam(BaseModel):
+    # uuid: str = Field(..., description="表名称", example="task")
+    environment_name: str = Field(..., description="环境名", example="task")
+    environment_type: str = Field(..., description="环境类型", example="task")
+    project_name: str = Field(..., description="名", example="task")
+    project_type: str = Field(..., description="类型", example="task")
+    ver: str = Field(..., description="版本", example="task")
+    owner: str = Field(..., description="编辑者", example="task")
+    key: str = Field(..., description="配置KEY", example="task")
+    value: str = Field(..., description="配置value", example="task")
+    value_type: str = Field(..., description="配置value类型", example="task")
+    host_name: str = Field(..., description="配置value所在机器host", example="task")
+    port: str = Field(..., description="配置value所在机器服务port", example="")
+    server_name: str = Field(..., description="配置value所在机器服务名称", example="task")
+    server_type: str = Field(..., description="配置value所在机器服务类型", example="es")
+    username: str = Field(..., description="配置value所在机器服务用户名", example="")
+    password: str = Field(..., description="配置value所在机器服务密码", example="")
+    device_name: str = Field(..., description="配置value所在机器名称", example="es.node1")
+    device_type: str = Field(..., description="配置value所在机器类型", example="es")
+    ssh_ip: str = Field(..., description="配置value所在机器ip", example="task")
+    ssh_port: str = Field(..., description="配置value所在机器ssh端口", example="task")
+    ssh_username: str = Field(..., description="配置value所在机器ssh用户名", example="task")
+    ssh_password: str = Field(..., description="配置value所在机器ssh密码", example="task")
+
+
+@app.post('/api/secretItemAuto/confItem')
+async def set_conf_item(body: SetConfItemParam, req: fastapi.Request,
+                        db: Session_secret = fastapi.Depends(get_db_secret)):
+    async with AuditWithExceptionContextManager(db, req, a_cls=modelsecret.Audit) as ctx:
+        data = await get_req_data(req)
+        for item in [
+            modelsecret.ConfItem().update_self(**data),
+            modelsecret.Project().update_self(**data),
+            modelsecret.Environment().update_self(**data),
+            modelsecret.ServerConfItem().update_self(**data),
+            modelsecret.Server().update_self(**data),
+            modelsecret.ServerDevice().update_self(**data),
+            modelsecret.Device().update_self(**data)
+        ]:
+            # c.uuid = f'{c.project}--{c.env}--{c.ver}--{c.key}--{c.value}'
+            db.merge(item)
+            db.commit()
     return ctx.res
 
 
@@ -241,7 +448,7 @@ async def html_list_secret(
         req: fastapi.Request,
         db: Session = fastapi.Depends(get_db_secret)):
     data = await get_req_data(req)
-    cls = item_clss_secret.get(item_name)
+    cls = item_clss_secret[item_name]
     if not cls:
         return "无此表格，请在{}中选择".format(
             ', '.join(f'<a href="/html/secret/{key}">{key}</a>' for key in item_clss_secret.keys())
@@ -249,5 +456,5 @@ async def html_list_secret(
     res = list(d.to_dict()
                for d in db.query(cls).filter(*(getattr(cls, k) == v for k, v in data.items())).all()
                )
-    return format_to_form(f"/api/secretItem/{item_name}", cls.get_columns()) + format_to_table(
+    return format_to_form(f"/api/secretItem/{item_name}", cls.get_columns_infos()) + format_to_table(
         res, keys=cls.get_columns())
