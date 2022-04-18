@@ -146,6 +146,7 @@ async def is_ctrl(
     return {
         "status": 1 if data.get('status') else db_status,
         "db_path": SQLALCHEMY_DATABASE_URL_SECRET,
+        "work_path": os.getcwd(),
         "user": token_data,
         'server_time': time.time()
     }
