@@ -1,5 +1,6 @@
 import datetime
 
+
 class Mixin:
     def __init__(self, **kwargs):
         self.update_self(**kwargs)

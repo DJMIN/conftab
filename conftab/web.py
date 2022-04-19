@@ -6,6 +6,7 @@ import traceback
 import guesstime
 
 import fastapi
+import fastapi.responses
 import logging
 from conftab.model import get_db, Conf, Session
 from conftab.modelsecret import get_db as get_db_secret
@@ -24,6 +25,7 @@ from pydantic import BaseModel, Field
 logger = logging.getLogger('conftab.web')
 
 item_clss_secret = {cls.__tablename__: cls for cls in (
+    modelsecret.User,
     modelsecret.Key,
     modelsecret.ConfGroup,
     modelsecret.ConfItem,
@@ -118,7 +120,7 @@ async def index():
         'server_time': time.time()}
 
 
-@app.get('/api/pubkey')
+@app.get('/api/pubkey', response_class=fastapi.responses.PlainTextResponse)
 async def pubkey_show():
     return rsa_ctrl.public_key
 
@@ -208,7 +210,7 @@ async def get_conf(req: fastapi.Request, db: Session = fastapi.Depends(get_db)):
         res = db.query(Conf).filter(*(getattr(
             Conf, k) == v for k, v in data.items())).order_by(desc(Conf.timeupdate)).limit(2).all()
         if len(res) == 1:
-            ctx.res = {'data': res.value, "raw": res, "res_raw": res[0]}
+            ctx.res = {'data': res[0].value, "raw": res, "res_raw": res[0]}
         elif len(res) > 1:
             ctx.res = {'data': None, 'err': '配置超过两个，请检查', "raw": res, "res_raw": res[0]}
         else:
@@ -221,7 +223,7 @@ async def list_conf(req: fastapi.Request, db: Session = fastapi.Depends(get_db))
     async with AuditWithExceptionContextManager(db, req, a_cls=model.Audit) as ctx:
         data = await get_req_data(req)
         res = db.query(Conf).filter(*(getattr(Conf, k) == v for k, v in data.items())).all()
-        ctx.res = res
+        ctx.res = [d.to_dict() for d in res]
     return ctx.res
 
 
@@ -249,8 +251,8 @@ async def get_conf(item_name, req: fastapi.Request, db: Session_secret = fastapi
         res = db.query(cls).filter(*(getattr(cls, k) == v for k, v in data.items())).order_by(
             desc(Conf.timecreate)).limit(2).all()
         if len(res) == 1:
-            ctx.res = {'data': getattr(builtins, res.value_type)(
-                res.value) if res.value_type in dir(builtins) else res.value, "raw": res, "res_raw": res[0]}
+            ctx.res = {'data': getattr(builtins, res[0].value_type)(
+                res[0].value) if res[0].value_type in dir(builtins) else res[0].value, "raw": res, "res_raw": res[0]}
         elif len(res) > 1:
             ctx.res = {'data': None, 'err': '配置超过两个，请检查', "raw": res, "res_raw": res[0]}
         else:
@@ -311,13 +313,8 @@ async def set_conf(item_name, req: fastapi.Request, db: Session_secret = fastapi
         data = await get_req_data(req)
         cls = item_clss_secret[item_name]
         cls_info = cls.get_columns_info()
-        c = cls(**{k: change_type[cls_info[k]['type_str'][:4]](v) for k, v in data.items()})
-        # c.uuid = f'{c.project}--{c.env}--{c.ver}--{c.key}--{c.value}'
-        time_now = datetime.datetime.now()
-        c.timecreate = time_now.timestamp()
-        c.time_create = time_now
-        c.timeupdate = time_now.timestamp()
-        c.time_update = time_now
+        data_kvs = {k: change_type[cls_info[k]['type_str'][:4]](v) for k, v in data.items()}
+        c = cls(**data_kvs).update_self(**data_kvs)
         db.merge(c)
         db.commit()
     return ctx.res
@@ -449,10 +446,10 @@ async def html_list_secret(
         req: fastapi.Request,
         db: Session = fastapi.Depends(get_db_secret)):
     data = await get_req_data(req)
-    cls = item_clss_secret[item_name]
+    cls = item_clss_secret.get(item_name)
     if not cls:
-        return "无此表格，请在{}中选择".format(
-            ', '.join(f'<a href="/html/secret/{key}">{key}</a>' for key in item_clss_secret.keys())
+        return "无此表格，请在</br>{}</br>中选择".format(
+            '</br>'.join(f'<a href="/html/secret/{key}">{key}</a>' for key in item_clss_secret.keys())
         )
     res = list(d.to_dict()
                for d in db.query(cls).filter(*(getattr(cls, k) == v for k, v in data.items())).all()

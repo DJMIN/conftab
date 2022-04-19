@@ -107,7 +107,7 @@ class Key(Base, Mixin):
 class User(Base, Mixin):
     __tablename__ = "user"
     username = Column(String(32), primary_key=True, nullable=False, index=True)
-    password = Column(String(1024), nullable=False)
+    password = Column(Text(), nullable=False)
     nickname = Column(String(32), nullable=False, index=True)
     active = Column(Integer, index=True)
 
@@ -169,7 +169,7 @@ class ConfItem(Base, Mixin):
     ver = Column(String(64), nullable=True, index=True)
 
     key = Column(String(64), index=True)
-    value = Column(String(1024))
+    value = Column(Text())
     value_type = Column(String(64), index=True)
 
     timecreate = Column(Integer, index=True)
@@ -212,22 +212,25 @@ class Environment(Base, Mixin):
 
 class ServerConfItem(Base, Mixin):
     __tablename__ = "server_conf_item"
-
-    server_name = Column(String(32), primary_key=True, nullable=False, index=True, unique=True)
-    server_type = Column(String(32), nullable=False, index=True)  # mysql/redis/es/mongo/filesystem/1
+    uuid = Column(String(128), primary_key=True, nullable=False, index=True, unique=True)
+    server_name = Column(String(32), nullable=False, index=True)
+    server_type = Column(String(32), nullable=True, index=True)  # mysql/redis/es/mongo/filesystem/1
     host = Column(String(64))
     port = Column(Integer)
     username = Column(String(64))
     password = Column(String(256))
 
     key = Column(String(64), index=True)
-    value = Column(String(1024))
+    value = Column(Text())
     value_type = Column(String(64), index=True)
 
     timecreate = Column(Integer, index=True)
     timeupdate = Column(Integer, index=True)
     time_create = Column(DateTime, index=True)
     time_update = Column(DateTime, index=True)
+
+    def gen_uuid(self):
+        return f'{self.server_name}-{self.key}'
 
 
 class Server(Base, Mixin):
