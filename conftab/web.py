@@ -291,6 +291,7 @@ async def list_item(
         query_d = db.query(cls).filter(
             *(getattr(cls, flr['key']) == flr['value']
               for flr in data.get('filters', [])))
+        total = query_d.count()
         if offset:
             query_d = query_d.offset(offset)
         if limit:
@@ -300,7 +301,7 @@ async def list_item(
         ctx.res = {
             "server_time": time.time(),
             "data": res,
-            "total": len(res),
+            "total": total,
         }
         if body.tableInfo:
             ctx.res["table_info"] = cls.get_columns_infos()
