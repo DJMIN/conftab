@@ -202,6 +202,45 @@ async def login_access_token(
     return ctx.res
 
 
+@app.get('/api/conf/genFile/{conf_group_uuid}')
+async def gen_file(
+        req: fastapi.Request,
+        conf_group_uuid: str,
+        db_pri: Session_secret = fastapi.Depends(get_db_secret)):
+    async with AuditWithExceptionContextManager(db_pri, req, a_cls=modelsecret.Audit) as ctx:
+        res = db_pri.query(modelsecret.ConfGroup).filter(modelsecret.ConfGroup.uuid == conf_group_uuid).all()[0]
+        base_url = str(req.base_url)
+        project = res.project_name
+        env = res.environment_name
+        pub_key = res.key_pub
+        pri_key = res.key_pri
+        ver = res.ver
+        data = await get_req_data(req)
+        package_key = data.get('package_key')
+        java_code = f"""{package_key}.config.conftab.server={base_url}/api/conf/get?project={project}&env={env}&ver={ver}&key=ALL
+{package_key}.config.conftab.rsaPrivateKey={pri_key}
+{package_key}.config.conftab.signPublicKey={pub_key}
+"""
+        python_code = f"""import json
+import conftab
+CT = json.loads(conftab.Tab(
+    '{base_url.replace('http://', '').replace('/', '')}',
+    project='{project}', env='{env}', ver='{ver}',
+    key_pub='''{pub_key}''',
+    key_pri='''{pri_key}'''
+).dict().get('ALL', '{{}}'))
+# 列出全部配置，变成字典方便调用
+print(f'当前配置为{{type(CT), CT}}')
+"""
+        json_code = res.value_raw
+        ctx.res = ctx.format_res('成功', {
+            "java_code": java_code,
+            "python_code": python_code,
+            "json_code": json_code,
+        })
+    return ctx.res
+
+
 @app.get('/api/conf/saveFromDB/{conf_group_uuid}')
 async def save_conf(
         req: fastapi.Request,
@@ -222,8 +261,8 @@ async def save_conf(
                 conf_group = conf_group.update_self(
                     value_raw=conf_value,
                     value_secret=rsa_c.encode(conf_value),
-                    key_pub=rsa_c.public_key,
-                    key_pri=rsa_c.private_key,
+                    key_pub=rsa_c.public_key.decode(),
+                    key_pri=rsa_c.private_key.decode(),
                 )
                 conf_group_dict = conf_group.to_dict()
                 db_pri.merge(conf_group)
@@ -233,7 +272,7 @@ async def save_conf(
                 conf_dict['value'] = conf_group_dict['value_secret']
                 conf_dict['project'] = conf_group_dict['project_name']
                 conf_dict['env'] = conf_group_dict['environment_name']
-                conf_dict['key'] = '__ALL_CONFTAB__'
+                conf_dict['key'] = 'ALL'
                 c = Conf().update_self(**conf_dict)
                 conf_dict = c.to_dict()
                 db_pub.merge(c)
