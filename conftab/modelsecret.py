@@ -80,30 +80,6 @@ def get_db():
         # db.dispose()
 
 
-class Key(Base, Mixin):
-    __tablename__ = "key"
-    uuid = Column(String(512), primary_key=True, index=True)
-
-    environment_name = Column(String(32), nullable=False, index=True)
-    environment_type = Column(String(64), index=True)
-    project_name = Column(String(32), nullable=False, index=True)
-    project_type = Column(String(32), nullable=True, index=True)
-    ver = Column(String(64), nullable=True, index=True)
-
-    key_pub = Column(String(4096))
-    key_pri = Column(String(4096))
-
-    conf_group_uuid = Column(String(512), index=True)
-    conf_group_value = Column(Text())
-    conf_group_value_type = Column(String(64), index=True)
-    conf_group_value_secret = Column(Text())
-
-    timecreate = Column(Integer, index=True)
-    timeupdate = Column(Integer, index=True)
-    time_create = Column(DateTime, index=True)
-    time_update = Column(DateTime, index=True)
-
-
 class User(Base, Mixin):
     __tablename__ = "user"
     username = Column(String(32), primary_key=True, nullable=False, index=True)
@@ -146,8 +122,13 @@ class ConfGroup(Base, Mixin):
     ver = Column(String(64), nullable=True, index=True)
 
     index = Column(Integer, index=True)
-    value = Column(Text())  # conf_item_list
+    value = Column(Text())
     value_type = Column(String(64), index=True)
+
+    key_pub = Column(String(4096))
+    key_pri = Column(String(4096))
+    value_raw = Column(Text())
+    value_secret = Column(Text())
 
     timecreate = Column(Integer, index=True)
     timeupdate = Column(Integer, index=True)

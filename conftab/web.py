@@ -1,10 +1,11 @@
 import builtins
 import datetime
+import json
 import os.path
 import time
 import traceback
+import typing
 import guesstime
-
 import fastapi
 import fastapi.responses
 import logging
@@ -26,7 +27,6 @@ logger = logging.getLogger('conftab.web')
 
 item_clss_secret = {cls.__tablename__: cls for cls in (
     modelsecret.User,
-    modelsecret.Key,
     modelsecret.ConfGroup,
     modelsecret.ConfItem,
     modelsecret.Project,
@@ -84,7 +84,7 @@ class AuditWithExceptionContextManager:
         return self
 
     @staticmethod
-    def format_res(message, detail='', suc=True):
+    def format_res(message, detail: typing.Union[str, dict, None] = '', suc=True):
         return {
             'code': 20000 if suc else 50000,
             'status': '成功' if suc else "失败",
@@ -128,7 +128,7 @@ async def pubkey_show():
 @app.get('/api/keyRandom')
 async def key_random():
     time_start = time.time()
-    rsa_c = RSACtrl(privatekey_path=PRIKEY_PATH, publickey_path=PUBKEY_PATH).load_or_generate_key(2048)
+    rsa_c = RSACtrl().load_or_generate_key(2048)
 
     return {
         "use_time": time.time() - time_start,
@@ -202,6 +202,51 @@ async def login_access_token(
     return ctx.res
 
 
+@app.get('/api/conf/saveFromDB/{conf_group_uuid}')
+async def save_conf(
+        req: fastapi.Request,
+        conf_group_uuid: str,
+        db_pub: Session = fastapi.Depends(get_db),
+        db_pri: Session_secret = fastapi.Depends(get_db_secret)):
+    async with AuditWithExceptionContextManager(db_pub, req, a_cls=model.Audit) as ctx_pub:
+        async with AuditWithExceptionContextManager(db_pri, req, a_cls=modelsecret.Audit) as ctx_pri:
+            res = db_pri.query(modelsecret.ConfGroup).filter(modelsecret.ConfGroup.uuid == conf_group_uuid).all()
+            if len(res) == 1:
+                rsa_c = RSACtrl().load_or_generate_key(2048)
+                conf_group = res[0]
+                conf_value = json.dumps({
+                    cell['data']['key']: cell['data']['value']
+                    for cell in json.loads(conf_group.value)['cells']
+                    if cell.get('parent')
+                })
+                conf_group = conf_group.update_self(
+                    value_raw=conf_value,
+                    value_secret=rsa_c.encode(conf_value),
+                    key_pub=rsa_c.public_key,
+                    key_pri=rsa_c.private_key,
+                )
+                conf_group_dict = conf_group.to_dict()
+                db_pri.merge(conf_group)
+                db_pri.commit()
+
+                conf_dict = {k: v for k, v in conf_group_dict.items()}
+                conf_dict['value'] = conf_group_dict['value_secret']
+                conf_dict['project'] = conf_group_dict['project_name']
+                conf_dict['env'] = conf_group_dict['environment_name']
+                conf_dict['key'] = '__ALL_CONFTAB__'
+                c = Conf().update_self(**conf_dict)
+                conf_dict = c.to_dict()
+                db_pub.merge(c)
+                db_pub.commit()
+                ctx_pri.res = ctx_pri.format_res('变更密钥成功', {'data': {
+                    'conf_group': conf_group_dict,
+                    'conf': conf_dict
+                }})
+            else:
+                ctx_pri.res = ctx_pri.format_res('conf_group uuid 不存在', suc=False)
+    return ctx_pri.res
+
+
 @app.get('/api/conf/get')
 async def get_conf(req: fastapi.Request, db: Session = fastapi.Depends(get_db)):
     logging.info(f'{dict(req.items())}')
@@ -210,6 +255,8 @@ async def get_conf(req: fastapi.Request, db: Session = fastapi.Depends(get_db)):
         res = db.query(Conf).filter(*(getattr(
             Conf, k) == v for k, v in data.items())).order_by(desc(Conf.timeupdate)).limit(2).all()
         if len(res) == 1:
+            if 'private_key' in data:
+                res[0].value = RSACtrl(private_key=data.pop('private_key')).decode(res[0].value)
             ctx.res = {'data': res[0].value, "raw": res, "res_raw": res[0]}
         elif len(res) > 1:
             ctx.res = {'data': None, 'err': '配置超过两个，请检查', "raw": res, "res_raw": res[0]}
@@ -232,6 +279,8 @@ async def set_conf(req: fastapi.Request, db: Session = fastapi.Depends(get_db)):
     logging.info(f'{dict(req.items())}')
     async with AuditWithExceptionContextManager(db, req, a_cls=model.Audit) as ctx:
         data = await get_req_data(req)
+        if 'public_key' in data:
+            data['value'] = RSACtrl(public_key=data.pop('public_key')).encode(data['value'])
         c = Conf(**data)
         # c.uuid = f'{c.project}--{c.env}--{c.ver}--{c.key}--{c.value}'
         c.uuid = f'{c.project}--{c.env}--{c.ver}--{c.key}'

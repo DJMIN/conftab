@@ -62,6 +62,9 @@ class Conf(Base, Mixin):
     time_create = Column(DateTime, index=True)
     time_update = Column(DateTime, index=True)
 
+    def gen_uuid(self):
+        return f'{self.project}--{self.env}--{self.ver}--{self.key}'
+
 
 class Audit(Base, Mixin):
     __tablename__ = "audit"
