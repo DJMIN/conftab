@@ -406,6 +406,7 @@ async def set_conf(item_name, req: fastapi.Request, db: Session_secret = fastapi
         c = cls(**data_kvs).update_self(**data_kvs)
         db.merge(c)
         db.commit()
+        ctx.res = ctx.format_res(c.to_dict())
     return ctx.res
 
 
