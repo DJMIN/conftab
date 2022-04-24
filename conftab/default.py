@@ -15,6 +15,11 @@ PUBKEY_PATH: str = './server_key_pub.key'
 PRIKEY_PATH: str = './server_key_pri.key'
 
 
+def set_web_port(port):
+    global WEB_PORT
+    WEB_PORT = port
+
+
 def set_url(url):
     global SQLALCHEMY_DATABASE_URL
     SQLALCHEMY_DATABASE_URL = url

@@ -14,6 +14,7 @@ from conftab.modelsecret import get_db as get_db_secret
 from conftab.modelsecret import Session as Session_secret
 from conftab import modelsecret
 from conftab import model
+from conftab import default
 from conftab.cyhper import RSACtrl
 from conftab.utils import get_req_data, format_to_table, format_to_form
 from conftab.default import SQLALCHEMY_DATABASE_URL, SQLALCHEMY_DATABASE_URL_SECRET, PUBKEY_PATH, PRIKEY_PATH
@@ -209,7 +210,7 @@ async def gen_file(
         db_pri: Session_secret = fastapi.Depends(get_db_secret)):
     async with AuditWithExceptionContextManager(db_pri, req, a_cls=modelsecret.Audit) as ctx:
         res = db_pri.query(modelsecret.ConfGroup).filter(modelsecret.ConfGroup.uuid == conf_group_uuid).all()[0]
-        base_url = str(req.base_url)
+        base_url = str(req.base_url).replace('http://', '').replace('/', '')+f':{default.WEB_PORT}'
         project = res.project_name
         env = res.environment_name
         pub_key = res.key_pub
@@ -221,14 +222,14 @@ async def gen_file(
         ver = res.ver
         data = await get_req_data(req)
         package_key = data.get('package_key', 'conftab')
-        java_code = f"""{package_key}.config.conftab.server={base_url}/api/conf/get?project={project}&env={env}&ver={ver}&key=ALL
+        java_code = f"""{package_key}.config.conftab.server=http://{base_url}/api/conf/get?project={project}&env={env}&ver={ver}&key=ALL
 {package_key}.config.conftab.rsaPrivateKey={pri_key_raw}
 {package_key}.config.conftab.signPublicKey={pub_key_raw}
 """
         python_code = f"""import json
 import conftab
 CT = json.loads(conftab.Tab(
-    '{base_url.replace('http://', '').replace('/', '')}',
+    '{base_url}',
     project='{project}', env='{env}', ver='{ver}',
     key_pub='''{pub_key}''',
     key_pri='''{pri_key}'''

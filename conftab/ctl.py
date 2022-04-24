@@ -2,7 +2,7 @@ import click
 import uvicorn
 import socket
 import os
-from conftab.default import WEB_PORT, WEB_HOST
+from conftab.default import WEB_PORT, WEB_HOST, set_web_port
 
 
 def run_app(host, port):
@@ -17,6 +17,7 @@ def run_app(host, port):
         "fmt"] = '[%(levelprefix)s][%(asctime)s][%(name)s] "%(pathname)s:%(lineno)d" %(message)s'
     LOGGING_CONFIG["formatters"]["access"][
         "fmt"] = '[%(levelprefix)s][%(asctime)s][%(name)s] [%(client_addr)s] "%(request_line)s" %(status_code)s'
+    set_web_port(port)
     uvicorn.run(app=app, host=host, port=port, workers=1, debug=True, log_config=LOGGING_CONFIG)
 
 

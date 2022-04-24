@@ -13,6 +13,8 @@ class Tab:
         else:
             self.host = ms[0]
             self.port = ms[-1]
+        self.host = self.host.replace(r'http://', '')
+        self.port = self.port.replace('/', '')
         self.manager_url = f"{self.host}:{self.port}"
         self.project = project
         self.env = env
