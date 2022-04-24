@@ -213,13 +213,17 @@ async def gen_file(
         project = res.project_name
         env = res.environment_name
         pub_key = res.key_pub
+        pub_key_raw = res.key_pub.replace("\n", '').split(
+            '-----BEGIN RSA PRIVATE KEY-----')[-1].split('-----END RSA PRIVATE KEY-----')[0]
         pri_key = res.key_pri
+        pri_key_raw = res.key_pri.replace("\n", '').split(
+            '-----BEGIN PUBLIC KEY-----')[-1].split('-----END PUBLIC KEY-----')[0]
         ver = res.ver
         data = await get_req_data(req)
-        package_key = data.get('package_key')
+        package_key = data.get('package_key', 'conftab')
         java_code = f"""{package_key}.config.conftab.server={base_url}/api/conf/get?project={project}&env={env}&ver={ver}&key=ALL
-{package_key}.config.conftab.rsaPrivateKey={pri_key}
-{package_key}.config.conftab.signPublicKey={pub_key}
+{package_key}.config.conftab.rsaPrivateKey={pri_key_raw}
+{package_key}.config.conftab.signPublicKey={pub_key_raw}
 """
         python_code = f"""import json
 import conftab
