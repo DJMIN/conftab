@@ -9,6 +9,9 @@ import guesstime
 import fastapi
 import fastapi.responses
 import logging
+
+from sqlalchemy.dialects.sqlite import TEXT
+from sqlalchemy.sql.expression import func
 from conftab.model import get_db, Conf, Session
 from conftab.modelsecret import get_db as get_db_secret
 from conftab.modelsecret import Session as Session_secret
@@ -37,6 +40,11 @@ item_clss_secret = {cls.__tablename__: cls for cls in (
     modelsecret.ServerDevice,
     modelsecret.Device,
     modelsecret.Audit,
+)}
+
+item_clss_pub = {cls.__tablename__: cls for cls in (
+    model.Conf,
+    model.Audit,
 )}
 
 
@@ -155,6 +163,34 @@ async def is_ctrl(
     }
 
 
+@app.get('/api/openDB')
+async def is_ctrl(
+        req: fastapi.Request,
+        token_data: Union[str, Any] = fastapi.Depends(check_jwt_token)
+):
+    db_path = SQLALCHEMY_DATABASE_URL_SECRET.split('sqlite:///')[-1]
+    db_path_backup = f'{db_path}.backup'
+
+    if os.path.exists(db_path_backup):
+        if os.path.exists(db_path):
+            os.remove(db_path)
+        os.rename(db_path_backup, db_path)
+        res = '已打开数据库'
+    else:
+        if os.path.exists(db_path_backup):
+            os.remove(db_path_backup)
+        os.rename(db_path, db_path_backup)
+        res = '已关闭数据库'
+
+    return {
+        "message": res,
+        "db_path": SQLALCHEMY_DATABASE_URL_SECRET,
+        "work_path": os.getcwd(),
+        "user": token_data,
+        'server_time': time.time()
+    }
+
+
 @app.get('/api/senderr')
 async def senderr(req: fastapi.Request, db: Session = fastapi.Depends(get_db)):
     async with AuditWithExceptionContextManager(db, req) as ctx:
@@ -210,7 +246,7 @@ async def gen_file(
         db_pri: Session_secret = fastapi.Depends(get_db_secret)):
     async with AuditWithExceptionContextManager(db_pri, req, a_cls=modelsecret.Audit) as ctx:
         res = db_pri.query(modelsecret.ConfGroup).filter(modelsecret.ConfGroup.uuid == conf_group_uuid).all()[0]
-        base_url = str(req.base_url).replace('http://', '').replace('/', '')+f':{default.WEB_PORT}'
+        base_url = str(req.base_url).replace('http://', '').replace('/', '') + f':{default.WEB_PORT}'
         project = res.project_name
         env = res.environment_name
         pub_key = res.key_pub
@@ -362,16 +398,37 @@ class ListItemParam(BaseModel):
         "value": "",
         'like': False,
     }])
+    sort: list = Field({}, description="排序", example=[{
+        'key': 'environment_name',
+        'value': 'asc',
+    }, {
+        'key': 'time_update',
+        'value': 'desc',
+    }])
     tableInfo: bool = Field(False, description="是否返回表信息", example=False)
 
 
-@app.post('/api/secretItem/{item_name}/list')
+@app.post('/api/{db_name}/{item_name}/list')
 async def list_item(
         item_name, body: ListItemParam,
-        req: fastapi.Request, db: Session_secret = fastapi.Depends(get_db_secret)):
-    async with AuditWithExceptionContextManager(db, req, a_cls=modelsecret.Audit) as ctx:
+        req: fastapi.Request,
+        db_name: str,
+        db_c: Session_secret = fastapi.Depends(get_db),
+        db_secret: Session_secret = fastapi.Depends(get_db_secret)):
+    if db_name == 'secretItem':
+        db = db_secret
+        a_cls = modelsecret.Audit
+        item_clss = item_clss_secret
+    elif db_name == 'publicItem':
+        db = db_c
+        a_cls = model.Audit
+        item_clss = item_clss_pub
+    else:
+        db = db_c
+        a_cls = model.Audit
+        item_clss = item_clss_pub
+    async with AuditWithExceptionContextManager(db, req, a_cls=a_cls) as ctx:
         data = await get_req_data(req)
-
         if "pageSize" in data:
             limit = int(data.pop('pageSize'))
             if "page" in data:
@@ -380,11 +437,33 @@ async def list_item(
                 offset = 0
         else:
             limit, offset = 0, 0
-        cls = item_clss_secret[item_name]
+        cls = item_clss[item_name]
+
+        ftr_d = []
+        for fd in data.get('filters', []):
+            f_nk, f_v, like = fd['key'], fd['value'], fd.get('like')
+            if "___" in f_nk:
+                ftr_table_name, f_k = f_nk.split('___')
+            else:
+                ftr_table_name, f_k = item_name, f_nk
+            # ftr_table_cls = getattr(models, "".join(s.capitalize() for s in ftr_table_name.split('_')))
+            if like:
+                ftr_d.append(
+                    func.cast(getattr(cls, f_k), TEXT()) == f_v if not isinstance(
+                        f_v, str) else func.cast(getattr(cls, f_k), TEXT()).like(f"%{f_v}%"))
+            else:
+                ftr_d.append(func.cast(getattr(cls, f_k), TEXT()) == f_v)
+
         query_d = db.query(cls).filter(
-            *(getattr(cls, flr['key']) == flr['value']
-              for flr in data.get('filters', [])))
+            *ftr_d
+            # *(getattr(cls, flr['key']) == flr['value'] for flr in data.get('filters', []))
+        )
+        print(query_d)
         total = query_d.count()
+        if sort := data.get('sort'):
+            query_d = query_d.order_by(
+                *(getattr(getattr(cls, flr['key']), flr['value'])()
+                  for flr in sort if flr['value'].lower() in ['desc', 'asc']))
         if offset:
             query_d = query_d.offset(offset)
         if limit:
