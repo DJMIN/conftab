@@ -111,6 +111,7 @@ class Audit(Base, Mixin):
     path_params = Column(Text())
     query_params = Column(Text())
     body = Column(Text())
+    res = Column(Text())
 
     error = Column(Text())
 
@@ -120,7 +121,7 @@ class Audit(Base, Mixin):
     time_update = Column(DateTime, index=True)
 
     @classmethod
-    async def add_self(cls, db: Session, req: Request, error=None):
+    async def add_self(cls, db: Session, req: Request, error=None, res=''):
         time_now = datetime.datetime.now()
         data = dict(
             uuid=uuid1().__str__().replace('-', ''),
@@ -137,6 +138,7 @@ class Audit(Base, Mixin):
             path_params=json.dumps(dict(req.path_params) or {}) or None,
             query_params=json.dumps(dict(req.query_params) or {}) or None,
             body=await req.body(),
+            res=str(res),
             error=error if isinstance(error, str) or not error
             else f'[{error.__class__}] {error}\n{traceback.format_exc()}',
             user=None,

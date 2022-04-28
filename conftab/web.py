@@ -109,12 +109,11 @@ class AuditWithExceptionContextManager:
                 if self._verbose else traceback.format_tb(exc_tb))
             exc_tb_str = f'{ex_str}\n{tb}'
             self.res = self.format_res(message=ex_str, detail=exc_tb_str, suc=False)
-            print(11111, self.res)
             if not self._raise__exception:
                 logger.error(exc_tb_str)
         else:
             exc_tb_str = None
-        await self.a_cls.add_self(self.db, self.req, exc_tb_str)
+        await self.a_cls.add_self(self.db, self.req, exc_tb_str, self.res)
 
         return not self._raise__exception  # __exit__方法 return True 不重新抛出错误
 
@@ -153,7 +152,8 @@ async def is_ctrl(
         token_data: Union[str, Any] = fastapi.Depends(check_jwt_token)
 ):
     data = await get_req_data(req)
-    db_status = 1 if os.path.exists(SQLALCHEMY_DATABASE_URL_SECRET.split('sqlite:///')[-1]) else 0
+    db_path = SQLALCHEMY_DATABASE_URL_SECRET.split('sqlite:///')[-1]
+    db_status = 1 if os.path.exists(db_path) and open(db_path, 'rb').read().startswith(b'SQLite format') else 0
     return {
         "status": 1 if data.get('status') else db_status,
         "db_path": SQLALCHEMY_DATABASE_URL_SECRET,
@@ -458,7 +458,7 @@ async def list_item(
             *ftr_d
             # *(getattr(cls, flr['key']) == flr['value'] for flr in data.get('filters', []))
         )
-        print(query_d)
+        sql_code = str(query_d)
         total = query_d.count()
         if sort := data.get('sort'):
             query_d = query_d.order_by(
@@ -473,6 +473,7 @@ async def list_item(
         ctx.res = {
             "server_time": time.time(),
             "data": res,
+            "sql_code": sql_code,
             "total": total,
         }
         if body.tableInfo:
