@@ -261,7 +261,7 @@ async def save_conf(
                 conf_value = json.dumps({
                     cell['data']['key']: cell['data']['value']
                     for cell in json.loads(conf_group.value)['cells']
-                    if cell.get('parent')
+                    if ((not cell.get('data', {}).get('parent')) and cell.get('data', {}).get('key'))
                 })
                 conf_group = conf_group.update_self(
                     value_raw=conf_value,
