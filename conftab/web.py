@@ -207,7 +207,7 @@ class UserInfo(BaseModel):
 async def login_access_token(
         *,
         req: fastapi.Request,
-        db: Session_secret = fastapi.Depends(get_db_secret),
+        db: Session = fastapi.Depends(get_db),
         user_info: UserInfo,
 ) -> Any:
     """
@@ -217,9 +217,9 @@ async def login_access_token(
     :return:
     """
 
-    async with AuditWithExceptionContextManager(db, req, a_cls=modelsecret.Audit) as ctx:
+    async with AuditWithExceptionContextManager(db, req, a_cls=model.Audit) as ctx:
         # 验证用户账号密码是否正确
-        user = modelsecret.User.authenticate(db, username=user_info.username, password=user_info.password)
+        user = model.User.authenticate(db, username=user_info.username, password=user_info.password)
 
         if not user:
             logger.info(f"用户认证错误, username:{user_info.username} password:{user_info.password}")
