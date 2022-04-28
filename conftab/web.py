@@ -572,37 +572,62 @@ class SetConfItemParam(BaseModel):
     key: str = Field(..., description="配置KEY", example="task")
     value: str = Field(..., description="配置value", example="task")
     value_type: str = Field(..., description="配置value类型", example="task")
+    kvs: list = Field([], description="配置kvs类型", example=[
+        {
+            'key': 'ES_HOST',
+            'value': '127.0.0.1',
+            'value_type': 'str',
+        },{
+            'key': 'ES_PORT',
+            'value': '9200',
+            'value_type': 'int',
+        }
+    ])
     host_name: str = Field(..., description="配置value所在机器host", example="task")
     port: str = Field(..., description="配置value所在机器服务port", example="")
     server_name: str = Field(..., description="配置value所在机器服务名称", example="task")
-    server_type: str = Field(..., description="配置value所在机器服务类型", example="es")
-    username: str = Field(..., description="配置value所在机器服务用户名", example="")
-    password: str = Field(..., description="配置value所在机器服务密码", example="")
-    device_name: str = Field(..., description="配置value所在机器名称", example="es.node1")
-    device_type: str = Field(..., description="配置value所在机器类型", example="es")
-    ssh_ip: str = Field(..., description="配置value所在机器ip", example="task")
-    ssh_port: str = Field(..., description="配置value所在机器ssh端口", example="task")
-    ssh_username: str = Field(..., description="配置value所在机器ssh用户名", example="task")
-    ssh_password: str = Field(..., description="配置value所在机器ssh密码", example="task")
+    server_type: str = Field('', description="配置value所在机器服务类型", example="es")
+    username: str = Field('', description="配置value所在机器服务用户名", example="")
+    password: str = Field('', description="配置value所在机器服务密码", example="")
+    device_name: str = Field('', description="配置value所在机器名称", example="es.node1")
+    device_type: str = Field('', description="配置value所在机器类型", example="es")
+    ssh_ip: str = Field('', description="配置value所在机器ip", example="task")
+    ssh_port: str = Field('', description="配置value所在机器ssh端口", example="task")
+    ssh_username: str = Field('', description="配置value所在机器ssh用户名", example="task")
+    ssh_password: str = Field('', description="配置value所在机器ssh密码", example="task")
 
 
 @app.post('/api/secretItemAuto/confItem')
 async def set_conf_item(body: SetConfItemParam, req: fastapi.Request,
                         db: Session_secret = fastapi.Depends(get_db_secret)):
     async with AuditWithExceptionContextManager(db, req, a_cls=modelsecret.Audit) as ctx:
-        data = await get_req_data(req)
-        for item in [
-            modelsecret.ConfItem().update_self(**data),
-            modelsecret.Project().update_self(**data),
-            modelsecret.Environment().update_self(**data),
-            modelsecret.ServerConfItem().update_self(**data),
-            modelsecret.Server().update_self(**data),
-            modelsecret.ServerDevice().update_self(**data),
-            modelsecret.Device().update_self(**data)
-        ]:
-            # c.uuid = f'{c.project}--{c.env}--{c.ver}--{c.key}--{c.value}'
-            db.merge(item)
-            db.commit()
+        data_kvs = await get_req_data(req)
+        if data_kvs.get('kvs'):
+            kvs = data_kvs.get('kvs')
+        else:
+            kvs = [{
+                'key': data_kvs.get('key'),
+                'value': data_kvs.get('value'),
+                'value_type': data_kvs.get('value_type'),
+            }]
+
+        data = {k: v for k, v in data_kvs.items()}
+        for kv in kvs:
+            data['key'] = kv['key']
+            data['value'] = kv['value']
+            data['value_type'] = kv['value_type']
+            for item in [
+                modelsecret.ConfItem().update_self(**data),
+                modelsecret.Project().update_self(**data),
+                modelsecret.Environment().update_self(**data),
+                modelsecret.ServerConfItem().update_self(**data),
+                modelsecret.Server().update_self(**data),
+                modelsecret.ServerDevice().update_self(**data),
+                modelsecret.Device().update_self(**data)
+            ]:
+                # c.uuid = f'{c.project}--{c.env}--{c.ver}--{c.key}--{c.value}'
+                db.merge(item)
+                db.commit()
     return ctx.res
 
 
