@@ -235,9 +235,9 @@ class ServerDevice(Base, Mixin):
 
     uuid = Column(String(64), primary_key=True, nullable=False, index=True, unique=True)
     server_name = Column(String(32), nullable=False, index=True)
-    server_type = Column(String(32), nullable=False, index=True)
+    server_type = Column(String(32), index=True)
     device_name = Column(String(32), nullable=False, index=True)
-    device_type = Column(String(32), nullable=False, index=True)
+    device_type = Column(String(32), index=True)
 
     timecreate = Column(Integer, index=True)
     timeupdate = Column(Integer, index=True)

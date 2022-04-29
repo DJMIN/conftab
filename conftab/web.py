@@ -622,12 +622,22 @@ async def set_conf_item(body: SetConfItemParam, req: fastapi.Request,
                 modelsecret.Environment().update_self(**data),
                 modelsecret.ServerConfItem().update_self(**data),
                 modelsecret.Server().update_self(**data),
-                modelsecret.ServerDevice().update_self(**data),
-                modelsecret.Device().update_self(**data)
             ]:
                 # c.uuid = f'{c.project}--{c.env}--{c.ver}--{c.key}--{c.value}'
                 db.merge(item)
                 db.commit()
+            if all(key in data for key in [
+                "server_name",
+                "device_name",
+            ]):
+                for item in [
+                    modelsecret.ServerDevice().update_self(**data),
+                    modelsecret.Device().update_self(**data)
+                ]:
+                    # c.uuid = f'{c.project}--{c.env}--{c.ver}--{c.key}--{c.value}'
+                    db.merge(item)
+                    db.commit()
+
     return ctx.res
 
 
