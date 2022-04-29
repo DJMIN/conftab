@@ -569,9 +569,9 @@ class SetConfItemParam(BaseModel):
     project_type: str = Field(..., description="类型", example="task")
     ver: str = Field(..., description="版本", example="task")
     owner: str = Field(..., description="编辑者", example="task")
-    key: str = Field(..., description="配置KEY", example="task")
-    value: str = Field(..., description="配置value", example="task")
-    value_type: str = Field(..., description="配置value类型", example="task")
+    key: str = Field(None, description="配置KEY", example="task")
+    value: str = Field(None, description="配置value", example="task")
+    value_type: str = Field(None, description="配置value类型", example="task")
     kvs: list = Field([], description="配置kvs类型", example=[
         {
             'key': 'ES_HOST',
