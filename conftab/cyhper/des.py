@@ -7,9 +7,10 @@ BS = DES3.block_size
 
 
 def pad(s):
-    return s + (BS - len(s) % BS) * chr(BS - len(s) % BS)
-
-
+    if isinstance(s, str):
+        return s + (BS - len(s) % BS) * chr(BS - len(s) % BS)
+    elif isinstance(s, bytes):
+        return s + (BS - len(s) % BS) * chr(BS - len(s) % BS).encode()
 # 定义 padding 即 填充 为PKCS7
 
 def un_pad(s):

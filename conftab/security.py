@@ -33,7 +33,7 @@ def create_access_token(
 
 def check_jwt_token(
         token: Optional[str] = Header(..., alias='X-Token'),
-        raise_err: Optional[str] = Query('', example='1'),
+        raise_err: Optional[str] = Query('1', example='1'),
 ) -> Union[str, Any]:
     """
     解析验证 headers中为token的值 当然也可以用 Header(..., alias="Authentication") 或者 alias="X-token"

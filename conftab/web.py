@@ -10,6 +10,7 @@ import fastapi
 import fastapi.responses
 import logging
 
+from fastapi import Query
 from sqlalchemy.dialects.sqlite import TEXT
 from sqlalchemy.sql.expression import func
 from conftab.model import get_db, Conf, Session
@@ -18,7 +19,7 @@ from conftab.modelsecret import Session as Session_secret
 from conftab import modelsecret
 from conftab import model
 from conftab import default
-from conftab.cyhper import RSACtrl
+from conftab.cyhper import RSACtrl, DES3Ctrl
 from conftab.utils import get_req_data, format_to_table, format_to_form
 from conftab.default import SQLALCHEMY_DATABASE_URL, SQLALCHEMY_DATABASE_URL_SECRET, PUBKEY_PATH, PRIKEY_PATH
 from conftab.security import create_access_token, check_jwt_token, ACCESS_TOKEN_EXPIRE_MINUTES
@@ -166,21 +167,54 @@ async def is_ctrl(
 @app.get('/api/openDB')
 async def is_ctrl(
         req: fastapi.Request,
+        key: str = Query(default='', description='加解密密钥'),
         token_data: Union[str, Any] = fastapi.Depends(check_jwt_token)
 ):
     db_path = SQLALCHEMY_DATABASE_URL_SECRET.split('sqlite:///')[-1]
     db_path_backup = f'{db_path}.backup'
+    res = ''
 
     if os.path.exists(db_path_backup):
         if os.path.exists(db_path):
             os.remove(db_path)
-        os.rename(db_path_backup, db_path)
-        res = '已打开数据库'
+        rf = open(db_path_backup, 'rb')
+        file_content = rf.read()
+        action = '打开'
+        if key:
+            try:
+                file_content = file_content.decode('utf-8')
+                file_content = DES3Ctrl(key).decrypt(file_content, encoding=None)
+                action = '解密'
+            except UnicodeDecodeError:
+                res = '数据库不是加密格式'
+        if not res:
+            if not file_content.startswith(b'SQLite format'):
+                res = '数据库解密密钥不对'
+            else:
+                with open(db_path, 'wb') as wf:
+                    wf.write(file_content)
+                rf.close()
+                os.remove(db_path_backup)
+                res = f'已{action}数据库'
+        rf.close()
     else:
         if os.path.exists(db_path_backup):
             os.remove(db_path_backup)
-        os.rename(db_path, db_path_backup)
-        res = '已关闭数据库'
+
+        if key:
+            if len(key) > 9:
+                with open(db_path, 'rb') as rf:
+                    file_content = rf.read()
+                    file_content = DES3Ctrl(key).encrypt(file_content)
+                    with open(db_path_backup, 'w', encoding='utf-8') as wf:
+                        wf.write(file_content)
+                os.remove(db_path)
+                res = '已加密数据库'
+            else:
+                res = '密钥过短，无法加密数据库'
+        else:
+            os.rename(db_path, db_path_backup)
+            res = '已关闭数据库'
 
     return {
         "message": res,
