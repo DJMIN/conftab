@@ -7,10 +7,13 @@ import traceback
 import typing
 import guesstime
 import fastapi
+import re
+import copy
 import fastapi.responses
 import logging
+import collections
 
-from fastapi import Query
+from fastapi import Query, Body
 from sqlalchemy.dialects.sqlite import TEXT
 from sqlalchemy.sql.expression import func
 from conftab.model import get_db, Conf, Session
@@ -145,6 +148,175 @@ async def key_random():
         "pri": rsa_c.private_key,
         'server_time': time.time()
     }
+
+
+def guess_key_and_sever(string: str):
+    property_keys = [
+        'ip',
+        'token',
+        'pass',
+        'password',
+        'port',
+        'host',
+        'user',
+        'hostname',
+        'username',
+        'name',
+        'db',
+        'url',
+        'path',
+        'servers',
+        'server',
+    ]
+    string = string.strip()
+    conf_key = string.lower()
+    string = re.sub(r'([a-z])([A-Z])', r'\1_\2', string)
+    strings = re.split(r'[_.\-\s\\\/]', string)
+
+    server_name = 'self'
+    if len(strings) == 1:
+        res = strings[0].lower()
+        if (
+                all(res.replace(key, '') not in property_keys for key in property_keys) and
+                any(res.endswith(key) for key in property_keys)
+        ):
+            for key in property_keys:
+                if res.endswith(key):
+                    conf_key = key
+                    server_name = res.replace(key, '').lower()
+                    break
+    elif len(strings) == 2:
+        if strings[0] in property_keys:
+            conf_key = strings[0].lower()
+            server_name = strings[-1].lower()
+        else:
+            conf_key = strings[-1].lower()
+            server_name = strings[0].lower()
+    elif len(strings) > 2:
+        if strings[0] in property_keys:
+            conf_key = strings[0].lower()
+            server_name = '_'.join(k.lower() for k in strings[1:])
+        elif strings[-1] in property_keys:
+            conf_key = strings[-1].lower()
+            server_name = '_'.join(k.lower() for k in strings[:-1])
+        else:
+            conf_key = '_'.join(k.lower() for k in strings)
+    else:
+        conf_key, server_name = '', ''
+    return conf_key, server_name
+
+
+def guess_type(string: str):
+    string = string.strip()
+    if '.' in string and len(string.split('.')) == 2 and string.replace('.', '').isdigit():
+        return 'float'
+    elif string.isdigit():
+        return 'int'
+    elif string.lower() in ['false', 'true']:
+        return 'bool'
+    else:
+        return 'string'
+
+
+class AnalysisTextParam(BaseModel):
+    text: str = Field(..., description="配置正文", example="""es_port=9200\nes_host=127.0.0.1\nesdb=127.0.0.1\nessdv=127.0.0.1\nmongosdv=127.0.0.1\nmongo_sdv=127.0.0.1""")
+    withServer: bool = Field(True, description="返回值携带服务信息", example=True)
+
+
+@app.post('/api/analysis/text')
+async def analysis_text(
+        req: fastapi.Request,
+        body: AnalysisTextParam,
+        db_secret: Session_secret = fastapi.Depends(get_db_secret)
+):
+    conf_content = body.text.split('\n')
+    conf_res = []
+    conf_res_raw = []
+    server_res = collections.defaultdict()
+    async with AuditWithExceptionContextManager(db_secret, req, a_cls=modelsecret.Audit) as ctx:
+        for line in conf_content:
+            line = line.strip()
+            if (
+                    line.startswith('#') or
+                    line.startswith('//') or
+                    line.startswith(':') or
+                    line.startswith('<') or
+                    line.startswith('>') or
+                    line.startswith(';')
+            ):
+                continue
+            key, value = line.split('=', maxsplit=1)
+            key = key.strip()
+            value = value.strip()
+            tmp_res = {
+                "key": key,
+                "value": value,
+                "value_type": guess_type(value),
+            }
+            conf_res_raw.append(copy.deepcopy(tmp_res))
+            if body.withServer:
+                conf_key, server_name = guess_key_and_sever(key)
+                tmp_res['key'] = conf_key
+                tmp_res['server_name'] = server_name
+                if server_name not in server_res:
+                    server_res[server_name] = collections.defaultdict()
+                # server_res[server_name][conf_key] = value
+                if conf_key in [
+                    'host',
+                    'hostname',
+                    'host_name',
+                ]:
+                    server_res[server_name]['host_name'] = value
+                if conf_key in [
+                    'port',
+                ]:
+                    server_res[server_name]['port'] = value
+                if server_name in [
+                    'es',
+                    'elastic',
+                    'elasticsearch',
+                    'elastic_search',
+                    'redis',
+                    'minio',
+                    'kafka',
+                    'mysql',
+                    'tidb',
+                    'mongo',
+                    'mongodb',
+                    'mongo_db',
+                ]:
+                    server_res[server_name]['server_type'] = server_name
+                if server_name in [
+                    'username',
+                    'user_name',
+                    'user',
+                    'name',
+                ]:
+                    server_res[server_name]['username'] = server_name
+                if server_name in [
+                    'password',
+                    'pass_word',
+                    'pass',
+                ]:
+                    server_res[server_name]['password'] = server_name
+                conf_res.append(tmp_res)
+        for conf in conf_res:
+            if conf['server_name'] in server_res:
+                conf.update(server_res[conf['server_name']])
+        ctx.res = ctx.format_res(
+            f'共处理{len(conf_content)},得到配置项{len(conf_res_raw)}个,'
+            f'服务数{len(server_res)}个,无效行数{len(conf_content) - len(conf_res_raw)}行',
+            {
+                'conf': conf_res_raw,
+                'conf_with_server': conf_res,
+                'server': server_res,
+                'cnt_line': len(conf_content),
+                'cnt_conf': len(conf_res_raw),
+                'cnt_server': len(server_res),
+                'cnt_err': len(conf_content) - len(conf_res_raw),
+            }
+        )
+    return ctx.res
 
 
 @app.get('/api/isCtrl')
@@ -597,12 +769,13 @@ async def del_item_pk(
 
 class SetConfItemParam(BaseModel):
     # uuid: str = Field(..., description="表名称", example="task")
-    environment_name: str = Field(..., description="环境名", example="task")
-    environment_type: str = Field(..., description="环境类型", example="task")
-    project_name: str = Field(..., description="名", example="task")
-    project_type: str = Field(..., description="类型", example="task")
-    ver: str = Field(..., description="版本", example="task")
-    owner: str = Field(..., description="编辑者", example="task")
+    environment_name: str = Field("", description="环境名", example="task")
+    environment_type: str = Field("", description="环境类型", example="task")
+    project_name: str = Field("", description="名", example="task")
+    project_type: str = Field("", description="类型", example="task")
+    ver: str = Field("", description="版本", example="task")
+    owner: str = Field("", description="编辑者", example="task")
+
     key: str = Field(None, description="配置KEY", example="task")
     value: str = Field(None, description="配置value", example="task")
     value_type: str = Field(None, description="配置value类型", example="task")
@@ -611,7 +784,7 @@ class SetConfItemParam(BaseModel):
             'key': 'ES_HOST',
             'value': '127.0.0.1',
             'value_type': 'str',
-        },{
+        }, {
             'key': 'ES_PORT',
             'value': '9200',
             'value_type': 'int',
@@ -651,15 +824,26 @@ async def set_conf_item(body: SetConfItemParam, req: fastapi.Request,
             data['value'] = kv['value']
             data['value_type'] = kv['value_type']
             for item in [
-                modelsecret.ConfItem().update_self(**data),
-                modelsecret.Project().update_self(**data),
-                modelsecret.Environment().update_self(**data),
                 modelsecret.ServerConfItem().update_self(**data),
                 modelsecret.Server().update_self(**data),
             ]:
                 # c.uuid = f'{c.project}--{c.env}--{c.ver}--{c.key}--{c.value}'
                 db.merge(item)
                 db.commit()
+            if all(key in data for key in [
+                "environment_name",
+                "project_name",
+                "ver",
+                "owner",
+            ]):
+                for item in [
+                    modelsecret.ConfItem().update_self(**data),
+                    modelsecret.Project().update_self(**data),
+                    modelsecret.Environment().update_self(**data),
+                ]:
+                    # c.uuid = f'{c.project}--{c.env}--{c.ver}--{c.key}--{c.value}'
+                    db.merge(item)
+                    db.commit()
             if all(key in data for key in [
                 "server_name",
                 "device_name",
