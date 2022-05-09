@@ -501,8 +501,8 @@ async def save_conf(
             if len(res) == 1:
                 conf_group = res[0]
                 rsa_c = RSACtrl(
-                    private_key=(conf_group.key_pri or None) if new_key else None,
-                    public_key=(conf_group.key_pub or None) if new_key else None
+                    private_key=None if new_key else (conf_group.key_pri or None),
+                    public_key=None if new_key else (conf_group.key_pub or None)
                 ).load_or_generate_key(2048)
                 conf_value = json.dumps({
                     cell['data']['key']: cell['data']['value']
