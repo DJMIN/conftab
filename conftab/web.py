@@ -794,8 +794,8 @@ class SetConfItemParam(BaseModel):
             'value_type': 'int',
         }
     ])
-    host_name: str = Field(..., description="配置value所在机器host", example="task")
-    port: str = Field(..., description="配置value所在机器服务port", example="")
+    host_name: str = Field('', description="配置value所在机器host", example="task")
+    port: str = Field('', description="配置value所在机器服务port", example="")
     server_name: str = Field(..., description="配置value所在机器服务名称", example="task")
     server_type: str = Field('', description="配置value所在机器服务类型", example="es")
     username: str = Field('', description="配置value所在机器服务用户名", example="")
