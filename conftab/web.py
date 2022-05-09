@@ -492,14 +492,18 @@ print(f'当前配置为{{type(CT), CT}}')
 async def save_conf(
         req: fastapi.Request,
         conf_group_uuid: str,
+        new_key: str = Query(default='', description='新建加解密密钥'),
         db_pub: Session = fastapi.Depends(get_db),
         db_pri: Session_secret = fastapi.Depends(get_db_secret)):
     async with AuditWithExceptionContextManager(db_pub, req, a_cls=model.Audit) as ctx_pub:
         async with AuditWithExceptionContextManager(db_pri, req, a_cls=modelsecret.Audit) as ctx_pri:
             res = db_pri.query(modelsecret.ConfGroup).filter(modelsecret.ConfGroup.uuid == conf_group_uuid).all()
             if len(res) == 1:
-                rsa_c = RSACtrl().load_or_generate_key(2048)
                 conf_group = res[0]
+                rsa_c = RSACtrl(
+                    private_key=(conf_group.key_pri or None) if new_key else None,
+                    public_key=(conf_group.key_pub or None) if new_key else None
+                ).load_or_generate_key(2048)
                 conf_value = json.dumps({
                     cell['data']['key']: cell['data']['value']
                     for cell in json.loads(conf_group.value)['cells']
@@ -524,7 +528,7 @@ async def save_conf(
                 conf_dict = c.to_dict()
                 db_pub.merge(c)
                 db_pub.commit()
-                ctx_pri.res = ctx_pri.format_res('变更密钥成功', {'data': {
+                ctx_pri.res = ctx_pri.format_res('成功', {'data': {
                     'conf_group': conf_group_dict,
                     'conf': conf_dict
                 }})
