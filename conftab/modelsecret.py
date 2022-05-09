@@ -119,7 +119,7 @@ class ConfGroup(Base, Mixin):
     environment_type = Column(String(64), index=True)
     project_name = Column(String(32), nullable=False, index=True)
     project_type = Column(String(32), nullable=True, index=True)
-    ver = Column(String(64), nullable=True, index=True)
+    ver = Column(String(64), nullable=False, index=True)
 
     index = Column(Integer, index=True)
     value = Column(Text())
@@ -147,7 +147,7 @@ class ConfItem(Base, Mixin):
     environment_type = Column(String(64), index=True)
     project_name = Column(String(32), nullable=False, index=True)
     project_type = Column(String(32), nullable=True, index=True)
-    ver = Column(String(64), nullable=True, index=True)
+    ver = Column(String(64), nullable=False, index=True)
 
     key = Column(String(64), index=True)
     value = Column(Text())
@@ -178,17 +178,22 @@ class Project(Base, Mixin):
 class Environment(Base, Mixin):
     __tablename__ = "environment"
 
-    environment_name = Column(String(32), primary_key=True, nullable=False, index=True, unique=True)
+    uuid = Column(String(512), primary_key=True, index=True)
+
+    environment_name = Column(String(32), nullable=False, index=True, unique=True)
     environment_type = Column(String(64), index=True)
     project_name = Column(String(32), nullable=False, index=True)
     project_type = Column(String(32), nullable=True, index=True)
-    ver = Column(String(64), nullable=True, index=True)
+    ver = Column(String(64), nullable=False, index=True)
     owner = Column(String(64))
 
     timecreate = Column(Integer, index=True)
     timeupdate = Column(Integer, index=True)
     time_create = Column(DateTime, index=True)
     time_update = Column(DateTime, index=True)
+
+    def gen_uuid(self):
+        return f'{self.project_name}-{self.environment_name}-{self.ver}'
 
 
 class ServerConfItem(Base, Mixin):
