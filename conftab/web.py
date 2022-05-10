@@ -691,8 +691,22 @@ async def list_item(
     return ctx.res
 
 
+@app.post('/api/secretItemNew/{item_name}')
+async def set_item_new(item_name, req: fastapi.Request, db: Session_secret = fastapi.Depends(get_db_secret)):
+    async with AuditWithExceptionContextManager(db, req, a_cls=modelsecret.Audit) as ctx:
+        data = await get_req_data(req)
+        cls = item_clss_secret[item_name]
+        cls_info = cls.get_columns_info()
+        data_kvs = {k: change_type[cls_info[k]['type_str'][:4]](v) for k, v in data.items()}
+        c = cls(**data_kvs).update_self(**data_kvs)
+        db.add(c)
+        db.commit()
+        ctx.res = ctx.format_res(c.to_dict())
+    return ctx.res
+
+
 @app.post('/api/secretItem/{item_name}')
-async def set_conf(item_name, req: fastapi.Request, db: Session_secret = fastapi.Depends(get_db_secret)):
+async def set_item(item_name, req: fastapi.Request, db: Session_secret = fastapi.Depends(get_db_secret)):
     async with AuditWithExceptionContextManager(db, req, a_cls=modelsecret.Audit) as ctx:
         data = await get_req_data(req)
         cls = item_clss_secret[item_name]

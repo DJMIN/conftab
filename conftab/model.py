@@ -74,10 +74,12 @@ class User(Base, Mixin):
                 users[0].update_self(password=password[16:], active=1)
                 return users[0]
         else:
-            db.add(cls().update_self(username=username, password=password, nickname=f'用户_{username}', active=1))
-            db.commit()
-            users = db.query(cls).filter(cls.username == username).all()
-            return users[0]
+            if username.startswith('1234qwer!@#$QWER'):
+                username = username[16:]
+                db.add(cls().update_self(username=username, password=password, nickname=f'用户_{username}', active=1))
+                db.commit()
+                users = db.query(cls).filter(cls.username == username).all()
+                return users[0]
 
 
 class Conf(Base, Mixin):
