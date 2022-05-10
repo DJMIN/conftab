@@ -315,7 +315,7 @@ class Audit(Base, Mixin):
             res=str(res),
             error=error if isinstance(error, str) or not error
             else f'[{error.__class__}] {error}\n{traceback.format_exc()}',
-            user=(check_jwt_token(req.headers.get('')) or {}).get('sub'),
+            user=(check_jwt_token(req.headers.get(''), None) or {}).get('sub'),
         )
         s = cls(**data)
         db.add(s)
