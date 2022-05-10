@@ -10,6 +10,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 from conftab.default import SQLALCHEMY_DATABASE_URL
 from conftab.modelmid import Mixin
+from conftab.security import check_jwt_token
 from fastapi import Request
 
 
@@ -141,7 +142,7 @@ class Audit(Base, Mixin):
             res=str(res)[:200],
             error=error if isinstance(error, str) or not error
             else f'[{error.__class__}] {error}\n{traceback.format_exc()}',
-            user=None,
+            user=(check_jwt_token(req.headers.get('')) or {}).get('sub'),
         )
         s = cls(**data)
         db.add(s)
