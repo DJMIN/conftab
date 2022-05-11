@@ -202,7 +202,7 @@ class ServerConfItem(Base, Mixin):
     uuid = Column(String(128), primary_key=True, nullable=False, index=True, unique=True)
     server_name = Column(String(32), nullable=False, index=True)
     server_type = Column(String(32), nullable=True, index=True)  # mysql/redis/es/mongo/filesystem/1
-    host = Column(String(64))
+    host_name = Column(String(64))
     port = Column(Integer)
     username = Column(String(64))
     password = Column(String(256))
