@@ -219,7 +219,8 @@ def guess_type(string: str):
 
 
 class AnalysisTextParam(BaseModel):
-    text: str = Field(..., description="配置正文", example="""es_port=9200\nes_host=127.0.0.1\nesdb=127.0.0.1\nessdv=127.0.0.1\nmongosdv=127.0.0.1\nmongo_sdv=127.0.0.1""")
+    text: str = Field(..., description="配置正文",
+                      example="""es_port=9200\nes_host=127.0.0.1\nesdb=127.0.0.1\nessdv=127.0.0.1\nmongosdv=127.0.0.1\nmongo_sdv=127.0.0.1""")
     withServer: bool = Field(True, description="返回值携带服务信息", example=True)
 
 
@@ -692,8 +693,12 @@ async def list_item(
 
 
 @app.post('/api/secretItemNew/{item_name}')
-async def set_item_new(item_name, req: fastapi.Request, db: Session_secret = fastapi.Depends(get_db_secret)):
-    async with AuditWithExceptionContextManager(db, req, a_cls=modelsecret.Audit) as ctx:
+async def set_item_new(
+        item_name, req: fastapi.Request,
+        body: dict = Body({}),
+        db: Session_secret = fastapi.Depends(get_db_secret),
+        db_log: Session_secret = fastapi.Depends(get_db_secret)):
+    async with AuditWithExceptionContextManager(db_log, req, a_cls=modelsecret.Audit) as ctx:
         data = await get_req_data(req)
         cls = item_clss_secret[item_name]
         cls_info = cls.get_columns_info()
@@ -706,8 +711,12 @@ async def set_item_new(item_name, req: fastapi.Request, db: Session_secret = fas
 
 
 @app.post('/api/secretItem/{item_name}')
-async def set_item(item_name, req: fastapi.Request, db: Session_secret = fastapi.Depends(get_db_secret)):
-    async with AuditWithExceptionContextManager(db, req, a_cls=modelsecret.Audit) as ctx:
+async def set_item(
+        item_name, req: fastapi.Request,
+        body: dict = Body({}),
+        db: Session_secret = fastapi.Depends(get_db_secret),
+        db_log: Session_secret = fastapi.Depends(get_db_secret)):
+    async with AuditWithExceptionContextManager(db_log, req, a_cls=modelsecret.Audit) as ctx:
         data = await get_req_data(req)
         cls = item_clss_secret[item_name]
         cls_info = cls.get_columns_info()
