@@ -1,4 +1,5 @@
 import json
+import logging
 import traceback
 
 from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, Text, VARCHAR, BigInteger, DateTime
@@ -147,11 +148,13 @@ class Audit(Base, Mixin):
             user=(check_jwt_token(req.headers.get('X-Token'), None) or {}).get('sub'),
         )
         s = cls(**data)
-        db.add(s)
+
         try:
+            db.add(s)
             db.commit()
-        except sqlalchemy.exc.PendingRollbackError:
-            pass
+        # except sqlalchemy.exc.PendingRollbackError:
+        except Exception as e:
+            logging.exception(e)
         return s
 
 
