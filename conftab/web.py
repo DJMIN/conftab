@@ -346,7 +346,7 @@ async def is_ctrl(
     db_path = SQLALCHEMY_DATABASE_URL_SECRET.split('sqlite:///')[-1]
     db_path_backup = f'{db_path}.backup'
     res = ''
-
+    status = 1
     if os.path.exists(db_path_backup):
         if os.path.exists(db_path):
             os.remove(db_path)
@@ -360,9 +360,11 @@ async def is_ctrl(
                 action = '解密'
             except UnicodeDecodeError:
                 res = '数据库不是加密格式'
+                status = 0
         if not res:
             if not file_content.startswith(b'SQLite format'):
                 res = '数据库解密密钥不对'
+                status = 0
             else:
                 with open(db_path, 'wb') as wf:
                     wf.write(file_content)
@@ -385,11 +387,13 @@ async def is_ctrl(
                 res = '已加密数据库'
             else:
                 res = '密钥过短，无法加密数据库'
+                status = 0
         else:
             os.rename(db_path, db_path_backup)
             res = '已关闭数据库'
 
     return {
+        "status": status,
         "message": res,
         "db_path": SQLALCHEMY_DATABASE_URL_SECRET,
         "work_path": os.getcwd(),
