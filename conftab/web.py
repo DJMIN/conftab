@@ -247,7 +247,7 @@ async def analysis_text(
             ):
                 continue
             key, value = line.split('=', maxsplit=1)
-            key = key.strip()
+            key = key.strip().split(':', maxsplit=1)[0].strip()
             value = value.strip()
             value_type = guess_type(value)
             if value_type == 'string':
