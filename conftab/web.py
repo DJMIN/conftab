@@ -492,7 +492,7 @@ CT = json.loads(conftab.Tab(
 # 列出全部配置，变成字典方便调用
 print(f'当前配置为{{type(CT), CT}}')
 """
-        json_code = res.value_raw
+        json_code = json.dumps(json.loads(res.value_raw), sort_keys=True, indent=4)
         ctx.res = ctx.format_res('成功', {
             "java_code": java_code,
             "python_code": python_code,
@@ -504,6 +504,7 @@ print(f'当前配置为{{type(CT), CT}}')
 def get_format_type(string_type, string):
     def _bool(_string):
         return not str(_string).lower() in ['false', '0', 'undefined', 'none', 'nan', '0.0']
+
     func_format = {
         "str": str,
         "string": str,
