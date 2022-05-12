@@ -107,7 +107,7 @@ class AuditWithExceptionContextManager:
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         if exc_tb is not None:
-            ex_str = f'[{str(exc_type)}] {str(exc_val)}'
+            ex_str = f'[{exc_type.__class__.__name__}] {str(exc_val)}'
             tb = '\n'.join(
                 traceback.format_tb(exc_tb, self._verbose)
                 if self._verbose else traceback.format_tb(exc_tb))
