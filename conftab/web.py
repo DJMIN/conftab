@@ -249,10 +249,14 @@ async def analysis_text(
             key, value = line.split('=', maxsplit=1)
             key = key.strip()
             value = value.strip()
+            value_type = guess_type(value)
+            if value_type == 'string':
+                if re.fullmatch(r"""['"`].*['"`]""", value):
+                    value = value[1:-1]
             tmp_res = {
                 "key": key,
                 "value": value,
-                "value_type": guess_type(value),
+                "value_type": value_type,
             }
             conf_res_raw.append(copy.deepcopy(tmp_res))
             if body.withServer:
@@ -265,6 +269,7 @@ async def analysis_text(
                 if conf_key in [
                     'host',
                     'hostname',
+                    'ip',
                     'host_name',
                 ]:
                     server_res[server_name]['host_name'] = value
