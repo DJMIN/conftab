@@ -107,7 +107,7 @@ class AuditWithExceptionContextManager:
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         if exc_tb is not None:
-            ex_str = f'[{exc_type.__class__.__name__}] {str(exc_val)}'
+            ex_str = f'[{exc_type.__name__}] {str(exc_val)}'
             tb = '\n'.join(
                 traceback.format_tb(exc_tb, self._verbose)
                 if self._verbose else traceback.format_tb(exc_tb))
@@ -367,7 +367,7 @@ async def is_ctrl(
                 res = '数据库不是加密格式'
                 status = 0
             except Exception as ex:
-                res = f'数据库解密失败，密钥不对：{ex.__class__.__name__}'
+                res = f'数据库解密失败，密钥不对：{ex.__name__}'
                 status = 0
         if not res:
             if not file_content.startswith(b'SQLite format'):
