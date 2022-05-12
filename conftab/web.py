@@ -367,7 +367,7 @@ async def is_ctrl(
                 res = '数据库不是加密格式'
                 status = 0
             except Exception as ex:
-                res = f'数据库解密失败，密钥不对：{ex.__name__}'
+                res = f'数据库解密失败，密钥不对：{ex.__class__.__name__}'
                 status = 0
         if not res:
             if not file_content.startswith(b'SQLite format'):
