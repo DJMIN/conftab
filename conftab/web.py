@@ -782,6 +782,34 @@ class ListItemPKParam(BaseModel):
     ])
 
 
+@app.get('/api/secretItemCleanByTable/{item_name}')
+async def del_s_item_pk(
+        item_name,
+        req: fastapi.Request, db: Session_secret = fastapi.Depends(get_db_secret)):
+    async with AuditWithExceptionContextManager(db, req, a_cls=modelsecret.Audit) as ctx:
+        cls = item_clss_secret[item_name]
+        db.query(cls).delete()
+        db.commit()
+        ctx.res = {
+            "server_time": time.time(),
+        }
+    return ctx.res
+
+
+@app.get('/api/itemCleanByTable/{item_name}')
+async def del_item_pk(
+        item_name,
+        req: fastapi.Request, db: Session = fastapi.Depends(get_db_secret)):
+    async with AuditWithExceptionContextManager(db, req, a_cls=model.Audit) as ctx:
+        cls = item_clss_secret[item_name]
+        db.query(cls).delete()
+        db.commit()
+        ctx.res = {
+            "server_time": time.time(),
+        }
+    return ctx.res
+
+
 @app.delete('/api/secretItemByPK/{item_name}')
 async def del_item_pk(
         item_name, body: ListItemPKParam,

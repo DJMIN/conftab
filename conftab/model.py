@@ -142,7 +142,7 @@ class Audit(Base, Mixin):
             path_params=json.dumps(dict(req.path_params) or {}) or None,
             query_params=json.dumps(dict(req.query_params) or {}) or None,
             body=await req.body(),
-            res=str(res)[:200],
+            res=str(res)[:512],
             error=error if isinstance(error, str) or not error
             else f'[{error.__class__}] {error}\n{traceback.format_exc()}',
             user=(check_jwt_token(req.headers.get('X-Token'), None) or {}).get('sub'),
