@@ -501,6 +501,21 @@ print(f'当前配置为{{type(CT), CT}}')
     return ctx.res
 
 
+def get_format_type(string_type, string):
+    def _bool(_string):
+        return not str(_string).lower() in ['false', '0', 'undefined', 'none', 'nan', '0.0']
+    func_format = {
+        "str": str,
+        "string": str,
+        "bool": _bool,
+        "int": int,
+        "float": float,
+        "object": json.loads,
+        "dict": json.loads,
+    }.get(string_type.lower(), str)
+    return func_format(string)
+
+
 @app.get('/api/conf/saveFromDB/{conf_group_uuid}')
 async def save_conf(
         req: fastapi.Request,
@@ -518,7 +533,7 @@ async def save_conf(
                     public_key=None if new_key else (conf_group.key_pub or None)
                 ).load_or_generate_key(2048)
                 conf_value = json.dumps({
-                    cell['data']['key']: cell['data']['value']
+                    cell['data']['key']: get_format_type(cell['data']['value_type'], cell['data']['value'])
                     for cell in json.loads(conf_group.value)['cells']
                     if ((not cell.get('data', {}).get('parent')) and cell.get('data', {}).get('key'))
                 })
