@@ -801,7 +801,7 @@ async def del_item_pk(
         item_name,
         req: fastapi.Request, db: Session = fastapi.Depends(get_db_secret)):
     async with AuditWithExceptionContextManager(db, req, a_cls=model.Audit) as ctx:
-        cls = item_clss_secret[item_name]
+        cls = item_clss_pub[item_name]
         db.query(cls).delete()
         db.commit()
         ctx.res = {
