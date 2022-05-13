@@ -60,14 +60,27 @@ def to_int(string):
     try:
         res = int(string)
     except ValueError:
-        res = 0
+        if string is None:
+            res = None
+        else:
+            res = 0
+    return res
+
+
+def to_str(string):
+    if string is None:
+        res = None
+    elif not string:
+        res = ''
+    else:
+        res = str(string).strip()
     return res
 
 
 change_type = {
     "INTE": to_int,
-    "VARC": str,
-    "TEXT": str,
+    "VARC": to_str,
+    "TEXT": to_str,
     "DATE": to_datetime,
 }
 
