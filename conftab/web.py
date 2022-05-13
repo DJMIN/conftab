@@ -59,7 +59,7 @@ def to_datetime(string):
 def to_int(string):
     try:
         res = int(string)
-    except TypeError:
+    except (ValueError, TypeError):
         res = None
     return res
 
