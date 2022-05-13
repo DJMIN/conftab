@@ -870,17 +870,17 @@ async def del_item_pk(
 
 class SetConfItemParam(BaseModel):
     # uuid: str = Field(..., description="表名称", example="task")
-    environment_name: str = Field("", description="环境名", example="task")
-    environment_type: str = Field("", description="环境类型", example="task")
-    project_name: str = Field("", description="名", example="task")
-    project_type: str = Field("", description="类型", example="task")
-    ver: str = Field("", description="版本", example="task")
-    owner: str = Field("", description="编辑者", example="task")
+    environment_name: typing.Optional[str] = Field("", description="环境名", example="task")
+    environment_type: typing.Optional[str] = Field("", description="环境类型", example="task")
+    project_name: typing.Optional[str] = Field("", description="名", example="task")
+    project_type: typing.Optional[str] = Field("", description="类型", example="task")
+    ver: typing.Optional[str] = Field("", description="版本", example="task")
+    owner: typing.Optional[str] = Field("", description="编辑者", example="task")
 
-    key: str = Field(None, description="配置KEY", example="task")
-    value: str = Field(None, description="配置value", example="task")
-    value_type: str = Field(None, description="配置value类型", example="task")
-    kvs: list = Field([], description="配置kvs类型", example=[
+    key: typing.Optional[str] = Field(None, description="配置KEY", example="task")
+    value: typing.Optional[str] = Field(None, description="配置value", example="task")
+    value_type: typing.Optional[str] = Field(None, description="配置value类型", example="task")
+    kvs: typing.Optional[list] = Field([], description="配置kvs类型", example=[
         {
             'key': 'ES_HOST',
             'value': '127.0.0.1',
@@ -891,18 +891,18 @@ class SetConfItemParam(BaseModel):
             'value_type': 'int',
         }
     ])
-    host_name: str = Field('', description="配置value所在机器host", example="task")
-    port: str = Field('', description="配置value所在机器服务port", example="")
+    host_name: typing.Optional[str] = Field('', description="配置value所在机器host", example="task")
+    port: typing.Optional[str] = Field('', description="配置value所在机器服务port", example="")
     server_name: str = Field(..., description="配置value所在机器服务名称", example="task")
-    server_type: str = Field('', description="配置value所在机器服务类型", example="es")
-    username: str = Field('', description="配置value所在机器服务用户名", example="")
-    password: str = Field('', description="配置value所在机器服务密码", example="")
-    device_name: str = Field('', description="配置value所在机器名称", example="es.node1")
-    device_type: str = Field('', description="配置value所在机器类型", example="es")
-    ssh_ip: str = Field('', description="配置value所在机器ip", example="task")
-    ssh_port: str = Field('', description="配置value所在机器ssh端口", example="task")
-    ssh_username: str = Field('', description="配置value所在机器ssh用户名", example="task")
-    ssh_password: str = Field('', description="配置value所在机器ssh密码", example="task")
+    server_type: typing.Optional[str] = Field('', description="配置value所在机器服务类型", example="es")
+    username: typing.Optional[str] = Field('', description="配置value所在机器服务用户名", example="")
+    password: typing.Optional[str] = Field('', description="配置value所在机器服务密码", example="")
+    device_name: typing.Optional[str] = Field('', description="配置value所在机器名称", example="es.node1")
+    device_type: typing.Optional[str] = Field('', description="配置value所在机器类型", example="es")
+    ssh_ip: typing.Optional[str] = Field('', description="配置value所在机器ip", example="task")
+    ssh_port: typing.Optional[str] = Field('', description="配置value所在机器ssh端口", example="task")
+    ssh_username: typing.Optional[str] = Field('', description="配置value所在机器ssh用户名", example="task")
+    ssh_password: typing.Optional[str] = Field('', description="配置value所在机器ssh密码", example="task")
 
 
 @app.post('/api/secretItemAuto/confItem')
