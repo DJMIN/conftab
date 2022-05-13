@@ -481,6 +481,9 @@ async def gen_file(
 {package_key}.config.conftab.rsaPrivateKey={pri_key_raw}
 {package_key}.config.conftab.signPublicKey={pub_key_raw}
 """
+        curl_code = f"""curl -o conftab-{project}.json http://{base_url}/api/conf/get?project={project}&env={env}&ver={ver}&key=ALL
+{project}_PrivateKey={pri_key_raw}
+{project}_PublicKey={pub_key_raw}"""
         python_code = f"""import json
 import conftab
 CT = json.loads(conftab.Tab(
@@ -497,6 +500,7 @@ print(f'当前配置为{{type(CT), CT}}')
             "java_code": java_code,
             "python_code": python_code,
             "json_code": json_code,
+            "curl_code": curl_code,
         })
     return ctx.res
 

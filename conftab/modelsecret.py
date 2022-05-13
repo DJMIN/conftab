@@ -204,7 +204,7 @@ class ServerConfItem(Base, Mixin):
     server_name = Column(String(32), nullable=False, index=True)
     server_type = Column(String(32), nullable=True, index=True)  # mysql/redis/es/mongo/filesystem/1
     host_name = Column(String(64))
-    port = Column(Integer)
+    port = Column(Integer, nullable=True)
     username = Column(String(64))
     password = Column(String(256))
 
@@ -225,9 +225,9 @@ class Server(Base, Mixin):
     __tablename__ = "server"
 
     server_name = Column(String(32), primary_key=True, nullable=False, index=True, unique=True)
-    server_type = Column(String(32), nullable=False, index=True)  # mysql/redis/es/mongo/filesystem/1
+    server_type = Column(String(32), nullable=True, index=True)  # mysql/redis/es/mongo/filesystem/1
     host_name = Column(String(64))
-    port = Column(Integer)
+    port = Column(Integer, nullable=True)
     username = Column(String(64))
     password = Column(String(256))
 
@@ -259,10 +259,10 @@ class Device(Base, Mixin):
     __tablename__ = "device"
 
     device_name = Column(String(32), primary_key=True, nullable=False, index=True, unique=True)
-    device_type = Column(String(32), nullable=False, index=True)
+    device_type = Column(String(32), nullable=True, index=True)
     host_name = Column(String(64))
     ssh_ip = Column(String(64))
-    ssh_port = Column(Integer)
+    ssh_port = Column(Integer, nullable=True)
     ssh_username = Column(String(64))
     ssh_password = Column(String(256))
 
