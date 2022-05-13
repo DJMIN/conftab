@@ -810,6 +810,8 @@ async def del_s_item_pk(
         cls = item_clss_secret[item_name]
         db.query(cls).delete()
         db.commit()
+        db.execute("VACUUM")
+        db.commit()
         ctx.res = {
             "server_time": time.time(),
         }
