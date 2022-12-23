@@ -135,7 +135,8 @@ class AuditWithExceptionContextManager:
 @app.get('/')
 async def index():
     return {
-        "server": 'conftab', "msg": "hello! http://127.0.0.1:7788/html/conf  http://127.0.0.1:7788/html/secret",
+        "server": 'conftab',
+        "msg": "try: http://127.0.0.1:7788/html/conf  http://127.0.0.1:7788/html/pub",
         "db": SQLALCHEMY_DATABASE_URL,
         "db_secert": SQLALCHEMY_DATABASE_URL_SECRET,
         "pubkey": rsa_ctrl.public_key,
@@ -752,6 +753,24 @@ async def set_item_new(
     return ctx.res
 
 
+@app.post('/api/pubItem/{item_name}')
+async def set_pub_item(
+        item_name, req: fastapi.Request,
+        body: dict = Body({}),
+        db: Session_secret = fastapi.Depends(get_db),
+        db_log: Session_secret = fastapi.Depends(get_db)):
+    async with AuditWithExceptionContextManager(db_log, req, a_cls=model.Audit) as ctx:
+        data = await get_req_data(req)
+        cls = item_clss_pub[item_name]
+        cls_info = cls.get_columns_info()
+        data_kvs = {k: change_type[cls_info[k]['type_str'][:4]](v) for k, v in data.items()}
+        c = cls(**data_kvs).update_self(**data_kvs)
+        db.merge(c)
+        db.commit()
+        ctx.res = ctx.format_res(c.to_dict())
+    return ctx.res
+
+
 @app.post('/api/secretItem/{item_name}')
 async def set_item(
         item_name, req: fastapi.Request,
@@ -967,6 +986,21 @@ async def html_list_conf(req: fastapi.Request, db: Session = fastapi.Depends(get
     return format_to_table(
         res,
         keys=['project', 'env', 'ver', 'time_create', 'time_update', 'value_type', 'key', 'value'])
+
+
+@app.get('/html/pub/{item_name:path}', response_class=fastapi.responses.HTMLResponse)
+async def html_list_confs(
+        item_name,
+        req: fastapi.Request,
+        db: Session = fastapi.Depends(get_db)):
+    data = await get_req_data(req)
+    cls = item_clss_pub.get(item_name)
+    if not cls:
+        return "无此表格，请在</br>{}</br>中选择".format(
+            '</br>'.join(f'<a href="/html/pub/{key}">{key}</a>' for key in item_clss_pub.keys()))
+    res = list(d.to_dict() for d in db.query(cls).filter(*(getattr(cls, k) == v for k, v in data.items())).all())
+    return format_to_form(f"/api/pubItem/{item_name}", cls.get_columns_infos()) + format_to_table(
+        res, keys=cls.get_columns())
 
 
 @app.get('/html/secret/{item_name:path}', response_class=fastapi.responses.HTMLResponse)
