@@ -56,6 +56,19 @@ def set_conf(key, value, manager_url=f'{WEB_HOST}:{WEB_PORT}', project=PROJECT_N
     }).json()
 
 
+def get_log(manager_url=f'{WEB_HOST}:{WEB_PORT}', page_size=1, page=10, sort='desc', **kwargs):
+    return requests.post(f'http://{manager_url}/api/publicItem/audit/list', data={
+        "sort": [{"key": 'timecreate', "value": sort}],
+        "pageSize": page_size,
+        "page": page,
+        "filters": [{'key': k, 'value': v, 'like': True} for k, v in kwargs.items()]
+    }).json()
+
+
+def clean_log(manager_url=f'{WEB_HOST}:{WEB_PORT}'):
+    return requests.get(f'http://{manager_url}/api/itemCleanByTable/audit').json()
+
+
 def gen_key():
     # TODO 注册一个密钥
     pass
@@ -64,6 +77,7 @@ def gen_key():
 def get_key(path):
     # TODO 注册并获取密钥保存到本地文件路径
     pass
+
 
 if __name__ == '__main__':
     print(set_conf('es_port', 9200))

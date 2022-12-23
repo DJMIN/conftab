@@ -1,4 +1,4 @@
-from conftab.function import get_conf, list_conf, set_conf
+from conftab.function import get_conf, list_conf, set_conf, clean_log, get_log
 from conftab.default import WEB_HOST, WEB_PORT, PROJECT_NAME, ENV, VERSION
 from conftab.cyhper import RSACtrl
 
@@ -84,3 +84,9 @@ class Tab:
         if self.can_encrypt:
             value = self.rsa_ctrl.encode(value)
         return set_conf(key, value, manager_url=self.manager_url, project=self.project, env=self.env, ver=self.ver)
+
+    def get_log(self, page_size=1, page=10, **kwargs):
+        return get_log(manager_url=self.manager_url, page_size=page_size, page=page, **kwargs)
+
+    def clean_log(self):
+        return clean_log(manager_url=self.manager_url)

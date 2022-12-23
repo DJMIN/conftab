@@ -850,7 +850,7 @@ async def del_s_item_pk(
 @app.get('/api/itemCleanByTable/{item_name}')
 async def del_item_pk(
         item_name,
-        req: fastapi.Request, db: Session = fastapi.Depends(get_db_secret)):
+        req: fastapi.Request, db: Session = fastapi.Depends(get_db)):
     async with AuditWithExceptionContextManager(db, req, a_cls=model.Audit) as ctx:
         cls = item_clss_pub[item_name]
         db.query(cls).delete()
