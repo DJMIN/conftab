@@ -14,8 +14,8 @@ pip install conftab
 # 运用sqlite数据库，-f指定配置数据的保存文件位置，方便备份和加密迁移，-p指定服务端的监听端口
 python -m conftab.ctl run -p 7788 -f './conftab.db'
 
-# 后台启动，日志写入conftab.log
-nohup python3.9 -m conftab.ctl run -p 7788 -f './conftab.db' > conftab.log 2>&1 &
+# 如果想要后台长期启动，可以利用nohup，并将日志写入conftab.log文件
+nohup python3.9 -m conftab.ctl run -p 7788 -h "0.0.0.0" -f './conftab.db' > conftab.log 2>&1 &
 
 ```
 

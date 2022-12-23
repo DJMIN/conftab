@@ -590,9 +590,9 @@ async def get_conf(req: fastapi.Request, db: Session = fastapi.Depends(get_db)):
         if len(res) == 1:
             if 'private_key' in data:
                 res[0].value = RSACtrl(private_key=data.pop('private_key')).decode(res[0].value)
-            ctx.res = {'data': res[0].value, "raw": res, "res_raw": res[0]}
+            ctx.res = {'data': res[0].value, "raw": [r.to_dict() for r in res], "res_raw": res[0].to_dict()}
         elif len(res) > 1:
-            ctx.res = {'data': None, 'err': '配置超过两个，请检查', "raw": res, "res_raw": res[0]}
+            ctx.res = {'data': None, 'err': '配置超过两个，请检查', "raw": [r.to_dict() for r in res], "res_raw": res[0].to_dict()}
         else:
             ctx.res = {'data': None, 'raw': [], 'res_raw': {}}
     return ctx.res

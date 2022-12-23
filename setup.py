@@ -2,7 +2,7 @@
 # coding=utf-8
 
 from setuptools import setup, find_packages
-from version import __VERSION__
+from conftab.version import __VERSION__
 
 
 with open('requirements.txt', encoding='utf-8') as f:
