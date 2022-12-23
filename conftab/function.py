@@ -57,7 +57,7 @@ def set_conf(key, value, manager_url=f'{WEB_HOST}:{WEB_PORT}', project=PROJECT_N
 
 
 def get_log(manager_url=f'{WEB_HOST}:{WEB_PORT}', page_size=1, page=10, sort='desc', **kwargs):
-    return requests.post(f'http://{manager_url}/api/publicItem/audit/list', data={
+    return requests.post(f'http://{manager_url}/api/publicItem/audit/list', json={
         "sort": [{"key": 'timecreate', "value": sort}],
         "pageSize": page_size,
         "page": page,
